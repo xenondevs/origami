@@ -34,3 +34,4 @@ build/
 out/
 target/
 .kotlin/
+.gradle/

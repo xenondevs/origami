@@ -1,0 +1,346 @@
+package xyz.xenondevs.origami
+
+import org.gradle.api.Named
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.api.attributes.Attribute
+import org.gradle.api.attributes.Usage
+import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Delete
+import org.gradle.jvm.tasks.Jar
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
+import org.gradle.kotlin.dsl.create
+import org.gradle.kotlin.dsl.findByType
+import org.gradle.kotlin.dsl.get
+import org.gradle.kotlin.dsl.getByName
+import org.gradle.kotlin.dsl.maven
+import org.gradle.kotlin.dsl.named
+import org.gradle.kotlin.dsl.of
+import org.gradle.kotlin.dsl.register
+import org.gradle.kotlin.dsl.registerIfAbsent
+import org.gradle.kotlin.dsl.repositories
+import org.gradle.kotlin.dsl.withType
+import xyz.xenondevs.origami.extension.OrigamiDependenciesExtension
+import xyz.xenondevs.origami.extension.OrigamiExtension
+import xyz.xenondevs.origami.extension.OrigamiJarExtension
+import xyz.xenondevs.origami.service.DownloaderService
+import xyz.xenondevs.origami.task.ApplyBinDiffTask
+import xyz.xenondevs.origami.task.ApplyPaperPatchesTask
+import xyz.xenondevs.origami.task.DecompileTask
+import xyz.xenondevs.origami.task.PrepareOrigamiLoaderTask
+import xyz.xenondevs.origami.task.PrepareOrigamiMarkerTask
+import xyz.xenondevs.origami.task.RemapTask
+import xyz.xenondevs.origami.task.VanillaDownloadTask
+import xyz.xenondevs.origami.task.WidenTask
+import xyz.xenondevs.origami.value.DevBundle
+import xyz.xenondevs.origami.value.DevBundleValueSource
+import xyz.xenondevs.origami.value.MacheConfigValueSource
+import java.io.File
+import javax.inject.Inject
+
+internal const val DEV_BUNDLE_CONFIG = "paperweightDevelopmentBundle"
+internal const val DEV_BUNDLE_COMPILE_CLASSPATH = "paperweightDevelopmentBundleCompileClasspath"
+internal const val MACHE_CONFIG = "macheConfig"
+internal const val CODEBOOK_CONFIG = "codebookConfig"
+internal const val PARCHMENT_CONFIG = "parchmentConfig"
+internal const val REMAPPER_CONFIG = "remapperConfig"
+internal const val DECOMPILER_CONFIG = "decompilerConfig"
+internal const val ORIGAMI_CONFIG = "origamiConfig"
+internal const val ORIGAMI_LOADER_CONFIG = "origamiLoaderConfig"
+
+private const val ORIGAMI_TASK_GROUP = "origami"
+private const val ORIGAMI_EXTENSION = "origami"
+
+abstract class OrigamiPlugin : Plugin<Project> {
+    
+    val version = this::class.java.classLoader.getResourceAsStream("version")?.bufferedReader()?.use { it.readText() }
+        ?: throw IllegalStateException("Could not read origami plugin version from resources")
+    
+    @get:Inject
+    abstract val javaToolchainService: JavaToolchainService
+    
+    override fun apply(target: Project) {
+        target.plugins.apply("java")
+        target.registerConfigurations()
+        val oriExt = target.registerExtensions()
+        
+        val dl = target.gradle.sharedServices.registerIfAbsent("origamiDownloader", DownloaderService::class)
+        
+        target.registerTasks(dl, oriExt)
+    }
+    
+    private fun Project.registerConfigurations() {
+        configurations.apply {
+            register(DEV_BUNDLE_CONFIG) {
+                attributes.attribute(
+                    Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
+                    objects.named("zip")
+                )
+            }
+            register(DEV_BUNDLE_COMPILE_CLASSPATH) {
+                attributes {
+                    attribute(
+                        Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
+                        objects.named("serverDependencies")
+                    )
+                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_API))
+                }
+            }
+            register(MACHE_CONFIG) {
+                attributes.attribute(
+                    Attribute.of("io.papermc.mache.output", Named::class.java),
+                    objects.named("zip")
+                )
+            }
+            register(CODEBOOK_CONFIG) { isTransitive = false }
+            register(PARCHMENT_CONFIG) { isTransitive = false }
+            register(REMAPPER_CONFIG) { isTransitive = false }
+            register(DECOMPILER_CONFIG) { isTransitive = false }
+            
+            register(ORIGAMI_CONFIG) {
+                isVisible = false
+                attributes.attribute(
+                    Usage.USAGE_ATTRIBUTE,
+                    objects.named(Usage.JAVA_RUNTIME)
+                )
+            }
+            
+            register(ORIGAMI_LOADER_CONFIG) {
+                isVisible = false
+                isTransitive = false
+                attributes.attribute(
+                    Usage.USAGE_ATTRIBUTE,
+                    objects.named(Usage.JAVA_RUNTIME)
+                )
+            }
+        }
+        
+        repositories {
+            maven("https://repo.papermc.io/repository/maven-public/") {
+                content {
+                    onlyForConfigurations(DEV_BUNDLE_CONFIG, DEV_BUNDLE_COMPILE_CLASSPATH, MACHE_CONFIG, ORIGAMI_CONFIG)
+                }
+            }
+            maven("https://maven.fabricmc.net/") {
+                content {
+                    onlyForConfigurations(ORIGAMI_CONFIG)
+                }
+            }
+        }
+    }
+    
+    private fun Project.registerExtensions(): OrigamiExtension {
+        val oriExt = extensions.create<OrigamiExtension>(ORIGAMI_EXTENSION)
+        oriExt.pluginId.convention(name)
+        
+        val devBundleNotation = providers.provider {
+            oriExt.devBundleVersion.orNull?.let { "${oriExt.devBundleGroup.get()}:${oriExt.devBundleArtifact.get()}:$it" }
+        }
+        dependencies.addProvider(DEV_BUNDLE_CONFIG, devBundleNotation)
+        dependencies.addProvider(DEV_BUNDLE_COMPILE_CLASSPATH, devBundleNotation)
+        dependencies.extensions.create<OrigamiDependenciesExtension>(ORIGAMI_EXTENSION, this)
+        
+        tasks.getByName<Delete>("clean") {
+            delete(oriExt.cache)
+        }
+        
+        val pluginVersion = this@OrigamiPlugin.version
+        tasks.withType<Jar>().configureEach { extensions.create<OrigamiJarExtension>(ORIGAMI_EXTENSION, this) }
+        dependencies.addProvider(ORIGAMI_CONFIG, providers.provider { "xyz.xenondevs.origami:origami:$pluginVersion" })
+        dependencies.addProvider(ORIGAMI_LOADER_CONFIG, providers.provider { "xyz.xenondevs.origami:origami-loader:$pluginVersion" })
+        
+        return oriExt
+    }
+    
+    private fun Project.registerTasks(dl: Provider<DownloaderService>, ext: OrigamiExtension) {
+        fun Provider<File>.toRegular() = layout.file(this)
+        
+        val bundleZip = configurations.named(DEV_BUNDLE_CONFIG).map { it.singleFile }.toRegular()
+        val macheZip = configurations.named(MACHE_CONFIG).map { it.singleFile }.toRegular()
+        
+        val devBundleInfo: Provider<DevBundle> =
+            providers.of(DevBundleValueSource::class) {
+                parameters.getZip().set(bundleZip)
+            }
+        val hasDevBundle = configurations.named(DEV_BUNDLE_CONFIG).map { it.allDependencies.isNotEmpty() }
+        val mcVerProvider = devBundleInfo.map(DevBundle::minecraftVersion)
+        
+        dependencies.addProvider(
+            MACHE_CONFIG,
+            devBundleInfo.map { it.mache.coordinates.first() }
+        )
+        
+        val macheConfig = providers.of(MacheConfigValueSource::class) {
+            parameters.getZip().set(macheZip)
+        }
+        
+        dependencies.addProvider(
+            CODEBOOK_CONFIG,
+            macheConfig.map { it.dependencies.codebook.first().toDependencyString() }
+        )
+        dependencies.addProvider(
+            PARCHMENT_CONFIG,
+            macheConfig.map { it.dependencies.paramMappings.first().toDependencyString() }
+        )
+        dependencies.addProvider(
+            REMAPPER_CONFIG,
+            macheConfig.map { it.dependencies.remapper.first().toDependencyString() }
+        )
+        dependencies.addProvider(
+            DECOMPILER_CONFIG,
+            macheConfig.map { it.dependencies.decompiler.first().toDependencyString() }
+        )
+        
+        val launcher = extensions.findByType<JavaPluginExtension>()?.toolchain?.let(javaToolchainService::launcherFor)
+            ?: javaToolchainService.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+        
+        val vanillaDownloads = tasks.register<VanillaDownloadTask>("_oriVanillaDownload") {
+            onlyIf { hasDevBundle.get() }
+            
+            minecraftVersion.set(mcVerProvider)
+            downloader.set(dl)
+            
+            val workDir = providers.zip(mcVerProvider, ext.cache) { version, cacheDir ->
+                cacheDir.dir("vanilla-$version")
+            }
+            
+            bundleJar.set(workDir.map { it.file("bundle.jar") })
+            serverMappings.set(workDir.map { it.file("server-mappings.txt") })
+            serverJar.set(workDir.map { it.file("server.jar") })
+            librariesDir.set(workDir.map { it.dir("libraries") })
+        }
+        
+        val applyBinDiff = tasks.register<ApplyBinDiffTask>("_oriApplyBinDiff") {
+            onlyIf { hasDevBundle.get() }
+            
+            vanillaServer.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverJar))
+            devBundleZip.set(bundleZip)
+            paperclipInternalPath.set(devBundleInfo.map(DevBundle::mojangMappedPaperclipFile))
+            minecraftVersion.set(mcVerProvider)
+            javaLauncher.set(launcher)
+            
+            val workDir = providers.zip(mcVerProvider, ext.cache) { version, cacheDir ->
+                cacheDir.dir("paperclip-$version")
+            }
+            
+            patchedJar.set(workDir.map { it.file("paperclip-patched.jar") })
+        }
+        
+        val remap = tasks.register<RemapTask>("_oriRemap") {
+            onlyIf { hasDevBundle.get() }
+            
+            vanillaServer.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverJar))
+            vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
+            mappings.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverMappings))
+            paramMappings.set(configurations.named(PARCHMENT_CONFIG).map { it.singleFile }.toRegular())
+            codebook.set(configurations.named(CODEBOOK_CONFIG).map { it.singleFile }.toRegular())
+            remapper.set(configurations.named(REMAPPER_CONFIG).map { it.singleFile }.toRegular())
+            remapperArgs.set(macheConfig.map { it.remapperArgs })
+            javaLauncher.set(launcher)
+            minecraftVersion.set(mcVerProvider)
+            
+            val workDir = providers.zip(mcVerProvider, ext.cache) { version, cacheDir ->
+                cacheDir.dir("remapped-$version")
+            }
+            
+            remappedJar.set(workDir.map { it.file("server-remapped.jar") })
+        }
+        
+        val decompile = tasks.register<DecompileTask>("_oriDecompile") {
+            onlyIf { hasDevBundle.get() }
+            
+            remappedJar.set(remap.flatMap(RemapTask::remappedJar))
+            vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
+            decompiler.set(configurations.named(DECOMPILER_CONFIG).map { it.singleFile }.toRegular())
+            decompilerArgs.set(macheConfig.map { it.decompilerArgs })
+            macheFile.set(macheZip)
+            javaLauncher.set(launcher)
+            minecraftVersion.set(mcVerProvider)
+            
+            val workDir = providers.zip(mcVerProvider, ext.cache) { version, cacheDir ->
+                cacheDir.dir("decompiled-$version")
+            }
+            
+            decompiledSources.set(workDir.map { it.file("server-decompiled.jar") })
+        }
+        
+        val applyPatches = tasks.register<ApplyPaperPatchesTask>("_oriApplyPaperPatches") {
+            onlyIf { hasDevBundle.get() }
+            
+            devBundleZip.set(bundleZip)
+            vanillaSources.set(decompile.flatMap(DecompileTask::decompiledSources))
+            minecraftVersion.set(mcVerProvider)
+            patchesRootName.set(devBundleInfo.map(DevBundle::patchDir))
+            
+            val workDir = providers.zip(mcVerProvider, ext.cache) { version, cacheDir ->
+                cacheDir.dir("decompiled-patched-$version")
+            }
+            
+            patchedJar.set(workDir.map { it.file("server-patched.jar") })
+            newSources.set(workDir.map { it.dir("new-sources") })
+            patchedSources.set(workDir.map { it.dir("patched-sources") })
+        }
+        
+        val widenMerge = tasks.register<WidenTask>("_oriWiden") {
+            onlyIf { hasDevBundle.get() }
+            
+            accessWidenerFile.set(ext.pluginId.map { id -> layout.projectDirectory.file("src/main/resources/$id.accesswidener") })
+            sourcesJar.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedJar))
+            newSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::newSources))
+            patchedSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedSources))
+            serverJar.set(applyBinDiff.flatMap(ApplyBinDiffTask::patchedJar))
+            librariesDir.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
+            
+            val workDir = ext.cache.dir("widened")
+            
+            outputClassesJar.set(workDir.map { it.file("paper-server-widened.jar") })
+            outputSourcesJar.set(workDir.map { it.file("paper-server-widened-sources.jar") })
+        }
+        
+        tasks.register<PrepareOrigamiLoaderTask>("_oriPrepareLoader") {
+            origamiConfig.set(configurations[ORIGAMI_CONFIG])
+            origamiLoaderConfig.set(configurations[ORIGAMI_LOADER_CONFIG])
+            version.set(this@OrigamiPlugin.version)
+            libsFolder.set("libs")
+            
+            outputDir.set(ext.cache.dir("loader-files"))
+        }
+        
+        tasks.register<PrepareOrigamiMarkerTask>("_oriPrepareMarker") {
+            origamiVersion.set(this@OrigamiPlugin.version)
+            pluginId.set(ext.pluginId)
+            
+            jsonOutput.set(ext.cache.file("origami.json"))
+        }
+        
+        afterEvaluate {
+            if (!hasDevBundle.get()) return@afterEvaluate
+            
+            gradle.projectsEvaluated {
+                val importTask = tasks.findByName("prepareKotlinBuildScriptModel")
+                    ?: tasks.findByName("ideaModule")
+                    ?: tasks.findByName("eclipseClasspath")
+                
+                importTask?.dependsOn(widenMerge)
+            }
+            
+            val cfg = macheConfig.get()
+            
+            repositories {
+                cfg.repositories.forEach { repo ->
+                    maven(repo.url) {
+                        name = repo.name
+                        content {
+                            repo.groups.forEach(::includeGroupAndSubgroups)
+                            onlyForConfigurations(
+                                CODEBOOK_CONFIG, PARCHMENT_CONFIG, REMAPPER_CONFIG, DECOMPILER_CONFIG
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
