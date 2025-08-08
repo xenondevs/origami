@@ -51,6 +51,14 @@ object DynamicInvoker {
                 m.signature = null
             }
         }
+        
+        clazz.fields.forEach { f ->
+            val newDesc = fixType(Type.getType(f.desc)).descriptor
+            if (newDesc != f.desc) {
+                f.desc = newDesc
+                f.signature = null
+            }
+        }
     }
     
     fun visitTypeInsn(list: InsnList, iter: InsnIterator, insn: TypeInsnNode) {
@@ -125,8 +133,8 @@ object DynamicInvoker {
             return
         
         if (isPluginType && !isPluginOwner) {
-            // TODO: plugin type in desc of added field in mixin
-            throw IllegalStateException("Added fields with plugin types are unsupported for now")
+            insn.desc = OBJECT_TYPE.descriptor
+            return
         }
         val owner = OBJECT_TYPE.descriptor
         val newDesc = when (insn.opcode) {
