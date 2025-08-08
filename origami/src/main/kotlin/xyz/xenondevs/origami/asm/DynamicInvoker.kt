@@ -31,7 +31,7 @@ object DynamicInvoker {
     val CONSTRUCTOR_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyConstructor", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
     val FIELD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyField", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
-
+    
     fun transform(clazz: ClassNode, pluginName: String) {
         clazz.methods.forEach { m ->
             val insns = m.instructions
@@ -41,8 +41,14 @@ object DynamicInvoker {
                     is TypeInsnNode -> visitTypeInsn(insns, iter, insn)
                     is MethodInsnNode -> visitMethodInsn(pluginName, insns, iter, insn)
                     is FieldInsnNode -> visitFieldInsn(pluginName, insns, iter, insn)
-                    is MultiANewArrayInsnNode -> visitMultiANewArrayInsn(insns, iter, insn)
+                    is MultiANewArrayInsnNode -> visitMultiANewArrayInsn(insn)
+                    is InvokeDynamicInsnNode -> visitInvokeDynamic(insn)
                 }
+            }
+            val newDesc = fixDesc(m.desc)
+            if (newDesc != m.desc) {
+                m.desc = newDesc
+                m.signature = null
             }
         }
     }
@@ -135,9 +141,29 @@ object DynamicInvoker {
         PluginProxy.addRequiredHandle(pluginName, insn.owner, HandleType.fromFieldOpcode(insn.opcode), insn.name, insn.desc)
     }
     
-    fun visitMultiANewArrayInsn(ist: InsnList, iter: InsnIterator, insn: MultiANewArrayInsnNode) {
+    fun visitMultiANewArrayInsn(insn: MultiANewArrayInsnNode) {
         if (isPluginClass(insn.desc))
             insn.desc = OBJECT_TYPE.internalName
+    }
+    
+    fun visitInvokeDynamic(insn: InvokeDynamicInsnNode) {
+        val handle = insn.bsm
+        if (handle.owner == PLUGIN_PROXY_NAME)
+            return
+        // TODO: cover indys to plugin classes outside the mixin
+        if (handle.owner == "java/lang/invoke/LambdaMetafactory" && handle.name == "metafactory") {
+            val dynamicMethod = insn.bsmArgs[1] as Handle
+            val dynamicMethodType = insn.bsmArgs[2] as Type
+            val fixedDesc = fixDesc(dynamicMethod.desc)
+            insn.bsmArgs[1] = Handle(
+                dynamicMethod.tag,
+                dynamicMethod.owner,
+                dynamicMethod.name,
+                fixedDesc,
+                dynamicMethod.isInterface
+            )
+            insn.bsmArgs[2] = Type.getType(fixDesc(dynamicMethodType.descriptor))
+        }
     }
     
     private fun isPluginClass(internalName: String): Boolean {
@@ -164,6 +190,12 @@ object DynamicInvoker {
             
             else -> type
         }
+    }
+    
+    private fun fixDesc(desc: String): String {
+        val returnType = fixType(Type.getReturnType(desc))
+        val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it) }
+        return Type.getMethodDescriptor(returnType, *argumentTypes.toTypedArray())
     }
     
 }
