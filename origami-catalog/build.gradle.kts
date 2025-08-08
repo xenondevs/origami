@@ -11,6 +11,7 @@ catalog {
         
         plugin("origami", "xyz.xenondevs.origami").versionRef("origami")
         
+        library("origami-plugin", "xyz.xenondevs.origami", "origami-gradle-plugin").versionRef("origami")
         library("mixin", "net.fabricmc", "sponge-mixin").versionRef("mixin")
         library("mixinextras", "io.github.llamalad7", "mixinextras-common").versionRef("mixinextras")
     }
