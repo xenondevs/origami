@@ -30,6 +30,18 @@ gradlePlugin {
     }
 }
 
+publishing {
+    repositories {
+        maven {
+            credentials {
+                name = "xenondevs"
+                url = uri { "https://repo.xenondevs.xyz/releases/" }
+                credentials(PasswordCredentials::class)
+            }
+        }
+    }
+}
+
 tasks.register("generateVersionFile") {
     val versionFile = layout.buildDirectory.file("resources/main/version").get().asFile
     doLast {

@@ -23,4 +23,14 @@ publishing {
             from(components["versionCatalog"])
         }
     }
+    
+    repositories {
+        maven {
+            credentials {
+                name = "xenondevs"
+                url = uri { "https://repo.xenondevs.xyz/releases/" }
+                credentials(PasswordCredentials::class)
+            }
+        }
+    }
 }

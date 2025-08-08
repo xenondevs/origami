@@ -18,11 +18,19 @@ dependencies {
 sourceSets.main { java.setSrcDirs(listOf("src/main/kotlin/")) }
 
 publishing {
-    repositories { mavenLocal() }
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
             artifactId = "origami"
+        }
+    }
+    repositories {
+        maven {
+            credentials {
+                name = "xenondevs"
+                url = uri { "https://repo.xenondevs.xyz/releases/" }
+                credentials(PasswordCredentials::class)
+            }
         }
     }
 }
