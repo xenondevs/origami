@@ -14,9 +14,6 @@ import java.util.stream.Collectors;
 
 public class PluginProxy {
     
-    // TODO: replace with proper module lookups
-    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
-    
     public static Map<String, Map<String, ClassHandles>> PLUGIN_HANDLES = new ConcurrentHashMap<>();
     
     public enum HandleType {
