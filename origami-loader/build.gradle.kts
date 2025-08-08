@@ -4,11 +4,19 @@ plugins {
 }
 
 publishing {
-    repositories { mavenLocal() }
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
             artifactId = "origami-loader"
+        }
+    }
+    repositories {
+        maven {
+            credentials {
+                name = "xenondevs"
+                url = uri { "https://repo.xenondevs.xyz/releases/" }
+                credentials(PasswordCredentials::class)
+            }
         }
     }
 }
