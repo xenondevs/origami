@@ -98,7 +98,12 @@ public class PluginProxy {
             throw new BootstrapMethodError("Class " + owner + " was not discovered during mixin scanning!");
         }
         if (!classHandle.initialized) {
-            throw new BootstrapMethodError("Class " + owner + " has not been initialized yet!");
+            try {
+                var pluginLookup = LookupProxy.getLookupFor(plugin);
+                pluginLookup.findClass(owner.replace('/', '.'));
+            } catch (Exception e) {
+                throw new BootstrapMethodError("Class " + owner + " can not been initialized yet!", e);
+            }
         }
         return classHandle;
     }
