@@ -286,7 +286,10 @@ abstract class OrigamiPlugin : Plugin<Project> {
         val widenMerge = tasks.register<WidenTask>("_oriWiden") {
             onlyIf { hasDevBundle.get() }
             
-            accessWidenerFile.set(ext.pluginId.map { id -> layout.projectDirectory.file("src/main/resources/$id.accesswidener") })
+            accessWidenerFile.set(ext.pluginId
+                .map { id -> layout.projectDirectory.file("src/main/resources/$id.accesswidener") }
+                .filter { it.asFile.exists() }
+            )
             sourcesJar.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedJar))
             newSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::newSources))
             patchedSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedSources))
