@@ -36,7 +36,6 @@ object PluginLoader {
     
     @Suppress("UNCHECKED_CAST")
     suspend fun loadPlugins() = coroutineScope {
-        val yaml = Yaml()
         val plugins = Path("plugins").listDirectoryEntries(glob = "*.jar")
         
         data class PluginInfo(val jar: JarFile, val origamiJson: JsonObject, val paperYml: Map<String, Any>)
@@ -55,7 +54,7 @@ object PluginLoader {
                         .use(JsonParser::parseReader)
                     val paperYml = jar.getInputStream(paperEntry)
                         .bufferedReader()
-                        .use { yaml.load<Map<String, Any>>(it) }
+                        .use { Yaml().load<Map<String, Any>>(it) }
                     PluginInfo(jar, origamiJson.asJsonObject, paperYml)
                 } catch (e: Exception) {
                     System.err.println("Failed to parse plugin from ${path.fileName}: ${e.message}")
