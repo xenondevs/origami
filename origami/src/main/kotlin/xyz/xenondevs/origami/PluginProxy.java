@@ -35,6 +35,19 @@ public class PluginProxy {
             };
         }
         
+        public static HandleType fromTag(int tag) {
+            return switch (tag) {
+                case Opcodes.H_INVOKEVIRTUAL, Opcodes.H_INVOKEINTERFACE -> VIRTUAL_METHOD;
+                case Opcodes.H_INVOKESTATIC -> STATIC_METHOD;
+                case Opcodes.H_NEWINVOKESPECIAL -> CONSTRUCTOR;
+                case Opcodes.H_GETFIELD -> VIRTUAL_GETTER;
+                case Opcodes.H_GETSTATIC -> STATIC_GETTER;
+                case Opcodes.H_PUTFIELD -> VIRTUAL_SETTER;
+                case Opcodes.H_PUTSTATIC -> STATIC_SETTER;
+                default -> throw new IllegalArgumentException("Invalid handle tag: " + tag);
+            };
+        }
+        
     }
     
     public record HandleKey(HandleType type, String name, String desc) {
@@ -58,7 +71,15 @@ public class PluginProxy {
     }
     
     @SuppressWarnings("unused") // indy to this created by DynamicInvoker
-    public static CallSite proxyMethod(MethodHandles.Lookup caller, String name, MethodType type, String plugin, String owner, String desc, int isStatic) {
+    public static CallSite proxyMethod(
+        MethodHandles.Lookup caller,
+        String name,
+        MethodType type,
+        String plugin,
+        String owner,
+        String desc,
+        int isStatic
+    ) {
         var classHandles = checkInitialized(plugin, owner);
         var key = new HandleKey(isStatic == 1 ? HandleType.STATIC_METHOD : HandleType.VIRTUAL_METHOD, name, desc);
         var mh = classHandles.handles.get(key);
@@ -68,7 +89,15 @@ public class PluginProxy {
     }
     
     @SuppressWarnings("unused") // indy to this created by DynamicInvoker
-    public static CallSite proxyField(MethodHandles.Lookup caller, String name, MethodType type, String plugin, String owner, String desc, int opcode) {
+    public static CallSite proxyField(
+        MethodHandles.Lookup caller,
+        String name,
+        MethodType type,
+        String plugin,
+        String owner,
+        String desc,
+        int opcode
+    ) {
         var classHandles = checkInitialized(plugin, owner);
         var handleType = HandleType.fromFieldOpcode(opcode);
         var key = new HandleKey(handleType, name, desc);
@@ -79,13 +108,50 @@ public class PluginProxy {
     }
     
     @SuppressWarnings("unused") // indy to this created by DynamicInvoker
-    public static CallSite proxyConstructor(MethodHandles.Lookup caller, String name, MethodType type, String plugin, String owner, String desc) {
+    public static CallSite proxyConstructor(
+        MethodHandles.Lookup caller,
+        String name,
+        MethodType type,
+        String plugin,
+        String owner,
+        String desc
+    ) {
         var classHandles = checkInitialized(plugin, owner);
         var key = new HandleKey(HandleType.CONSTRUCTOR, "<init>", desc);
         var mh = classHandles.handles.get(key);
         if (mh == null)
             throw new BootstrapMethodError("Constructor call of " + owner + desc + " was not discovered during mixin scanning but is being accessed!");
         return new ConstantCallSite(mh.asType(type));
+    }
+    
+    @SuppressWarnings("unused") // indy to this created by DynamicInvoker
+    public static CallSite proxyMetafactory(
+        MethodHandles.Lookup caller,
+        String interfaceMethod,
+        MethodType factoryType,
+        String plugin,
+        MethodType interfaceMethodType,
+        String targetOwner,
+        String targetName,
+        String originalTargetDesc,
+        String originalDynamicDesc,
+        int handleTag
+    ) throws LambdaConversionException {
+        var classHandles = checkInitialized(plugin, targetOwner);
+        var key = new HandleKey(HandleType.fromTag(handleTag), targetName, originalTargetDesc);
+        var mh = classHandles.handles.get(key);
+        if (mh == null)
+            throw new BootstrapMethodError("Method call " + targetName + originalTargetDesc + " in class " + targetOwner + " was not discovered during mixin scanning but is being accessed!");
+        
+        var pluginProxy = LookupProxy.getLookupFor(plugin);
+        return LambdaMetafactory.metafactory(
+            pluginProxy,
+            interfaceMethod,
+            factoryType,
+            interfaceMethodType,
+            mh,
+            toMethodType(originalDynamicDesc, pluginProxy.lookupClass().getClassLoader())
+        );
     }
     
     private static ClassHandles checkInitialized(String plugin, String owner) {
