@@ -5,6 +5,7 @@ import kotlinx.coroutines.runBlocking
 import org.spongepowered.asm.launch.MixinBootstrap
 import org.spongepowered.asm.mixin.MixinEnvironment
 import xyz.xenondevs.origami.asm.LazyClassPath
+import xyz.xenondevs.origami.asm.LookupProxy
 import xyz.xenondevs.origami.mixin.OrigamiMixinService
 import xyz.xenondevs.origami.transformer.paper.PaperTransformers
 import xyz.xenondevs.origami.transformer.paper.PaperclipPatcher

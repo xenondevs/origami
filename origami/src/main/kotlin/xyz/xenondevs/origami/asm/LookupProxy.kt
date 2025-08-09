@@ -1,9 +1,9 @@
-package xyz.xenondevs.origami
+package xyz.xenondevs.origami.asm
 
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.MethodNode
-import xyz.xenondevs.origami.asm.PatchClassWriter
+import xyz.xenondevs.origami.Origami
 import xyz.xenondevs.origami.util.buildClass
 import xyz.xenondevs.origami.util.buildInsnList
 import xyz.xenondevs.origami.util.internalName
@@ -69,7 +69,7 @@ object LookupProxy {
             })
         }
         
-        val classWriter = PatchClassWriter(Origami.instance.minecraftClasspath, ClassWriter.COMPUTE_MAXS)
+        val classWriter = PatchClassWriter(Origami.Companion.instance.minecraftClasspath, ClassWriter.COMPUTE_MAXS)
         clazz.accept(classWriter)
         return LookupClassDefinition(className, classWriter.toByteArray())
     }

@@ -5,9 +5,9 @@ import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldNode
 import org.objectweb.asm.tree.LabelNode
 import org.objectweb.asm.tree.MethodInsnNode
-import xyz.xenondevs.origami.LookupProxy
-import xyz.xenondevs.origami.LookupProxy.LookupClassDefinition
 import xyz.xenondevs.origami.PluginProxy
+import xyz.xenondevs.origami.asm.LookupProxy
+import xyz.xenondevs.origami.asm.LookupProxy.LookupClassDefinition
 import xyz.xenondevs.origami.transformer.paper.PaperPluginMetaTransformer.ENABLED_FIELD
 import xyz.xenondevs.origami.util.InsnBuilder
 import xyz.xenondevs.origami.util.buildInsnList
@@ -63,7 +63,7 @@ object PaperPluginClassLoaderTransformer : PaperTransformer {
             addLabel()
             aLoad(0)
             getField(clazz.name, PLUGIN_NAME_FIELD, "Ljava/lang/String;")
-            invokeStatic(LookupProxy::class.internalName, "createLookupClass", "(Ljava/lang/String;)Lxyz/xenondevs/origami/LookupProxy\$LookupClassDefinition;")
+            invokeStatic(LookupProxy::class.internalName, "createLookupClass", "(Ljava/lang/String;)Lxyz/xenondevs/origami/asm/LookupProxy\$LookupClassDefinition;")
             aStore(newLocal)
             
             addLabel()

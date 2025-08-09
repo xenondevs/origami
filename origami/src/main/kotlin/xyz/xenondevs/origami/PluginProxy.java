@@ -3,6 +3,7 @@ package xyz.xenondevs.origami;
 import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import xyz.xenondevs.origami.asm.LookupProxy;
 
 import java.lang.invoke.*;
 import java.util.ArrayList;
@@ -15,6 +16,16 @@ import java.util.stream.Collectors;
 public class PluginProxy {
     
     public static Map<String, Map<String, ClassHandles>> PLUGIN_HANDLES = new ConcurrentHashMap<>();
+    
+    private static MethodHandle CLASS_INSTANCE_HANDLE;
+    
+    static {
+        try {
+            CLASS_INSTANCE_HANDLE = MethodHandles.lookup().findVirtual(Class.class, "isInstance", MethodType.methodType(boolean.class, Object.class));
+        } catch (NoSuchMethodException | IllegalAccessException e) {
+            throw new RuntimeException("Failed to find Class.isInstance method handle", e);
+        }
+    }
     
     public enum HandleType {
         CONSTRUCTOR,
@@ -152,6 +163,24 @@ public class PluginProxy {
             mh,
             toMethodType(originalDynamicDesc, pluginProxy.lookupClass().getClassLoader())
         );
+    }
+    
+    @SuppressWarnings("unused") // indy to this created by DynamicInvoker
+    public static CallSite proxyInstanceOf(
+        MethodHandles.Lookup caller,
+        String name,
+        MethodType type,
+        String plugin,
+        String className
+    ) {
+        try {
+            var lookup = LookupProxy.getLookupFor(plugin);
+            var clazz = lookup.findClass(className.replace('/', '.'));
+            var handle = CLASS_INSTANCE_HANDLE.bindTo(clazz);
+            return new ConstantCallSite(handle);
+        } catch (Exception e) {
+            throw new BootstrapMethodError("Failed to find class " + className + " for instanceof proxy in plugin " + plugin, e);
+        }
     }
     
     private static ClassHandles checkInitialized(String plugin, String owner) {

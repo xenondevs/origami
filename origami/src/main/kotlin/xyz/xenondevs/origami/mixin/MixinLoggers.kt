@@ -10,8 +10,8 @@ import org.objectweb.asm.tree.TableSwitchInsnNode
 import org.spongepowered.asm.logging.ILogger
 import org.spongepowered.asm.logging.Level
 import org.spongepowered.asm.logging.LoggerAdapterAbstract
-import xyz.xenondevs.origami.LookupProxy
 import xyz.xenondevs.origami.Origami
+import xyz.xenondevs.origami.asm.LookupProxy
 import xyz.xenondevs.origami.asm.PatchClassWriter
 import xyz.xenondevs.origami.util.InsnBuilder
 import xyz.xenondevs.origami.util.buildInsnList
