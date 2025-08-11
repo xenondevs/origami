@@ -42,23 +42,23 @@ object DynamicInvoker {
             val iter = insns.iterator()
             while (iter.hasNext()) {
                 when (val insn = iter.next()) {
-                    is TypeInsnNode -> visitTypeInsn(pluginName, insns, iter, insn)
-                    is MethodInsnNode -> visitMethodInsn(pluginName, insns, iter, insn)
-                    is FieldInsnNode -> visitFieldInsn(pluginName, insns, iter, insn)
-                    is MultiANewArrayInsnNode -> visitMultiANewArrayInsn(insn)
+                    is TypeInsnNode -> visitTypeInsn(pluginName, insns, iter, insn, clazz.name)
+                    is MethodInsnNode -> visitMethodInsn(pluginName, insns, iter, insn, clazz.name)
+                    is FieldInsnNode -> visitFieldInsn(pluginName, insns, iter, insn, clazz.name)
+                    is MultiANewArrayInsnNode -> visitMultiANewArrayInsn(insn, clazz.name)
                     is InvokeDynamicInsnNode -> visitInvokeDynamic(pluginName, iter, insn, clazz.name)
                 }
             }
-            m.desc = fixDesc(m.desc)
+            m.desc = fixDesc(m.desc, clazz.name)
         }
         
         clazz.fields.forEach { f ->
-            f.desc = fixType(Type.getType(f.desc)).descriptor
+            f.desc = fixType(Type.getType(f.desc), clazz.name).descriptor
         }
     }
     
-    fun visitTypeInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: TypeInsnNode) {
-        if (!isPluginClass(insn.desc))
+    fun visitTypeInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: TypeInsnNode, currentClass: String) {
+        if (!isPluginClass(insn.desc, currentClass))
             return
         
         when (insn.opcode) {
@@ -90,8 +90,8 @@ object DynamicInvoker {
         }
     }
     
-    fun visitMethodInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: MethodInsnNode) {
-        if (!isPluginClass(insn.owner))
+    fun visitMethodInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: MethodInsnNode, currentClass: String) {
+        if (!isPluginClass(insn.owner, currentClass))
             return
         
         val owner = insn.owner
@@ -100,8 +100,8 @@ object DynamicInvoker {
         
         when (insn.opcode) {
             Opcodes.INVOKEVIRTUAL, Opcodes.INVOKESTATIC, Opcodes.INVOKEINTERFACE -> {
-                val returnType = fixType(Type.getReturnType(desc))
-                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it) }
+                val returnType = fixType(Type.getReturnType(desc), currentClass)
+                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it, currentClass) }
                 if (insn.opcode != Opcodes.INVOKESTATIC) {
                     argumentTypes.add(0, OBJECT_TYPE)
                 }
@@ -115,7 +115,7 @@ object DynamicInvoker {
                 if (name != "<init>")
                     return // TODO: plugin types in desc possible?
                 
-                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it) }
+                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it, currentClass) }
                 val newDesc = Type.getMethodDescriptor(OBJECT_TYPE, *argumentTypes.toTypedArray())
                 iter.set(InvokeDynamicInsnNode("ctor" + desc.hashCode().toString(), newDesc, CONSTRUCTOR_PROXY_HANDLE, pluginName, owner, desc))
                 PluginProxy.addRequiredHandle(pluginName, owner, HandleType.CONSTRUCTOR, name, desc)
@@ -125,10 +125,10 @@ object DynamicInvoker {
         }
     }
     
-    fun visitFieldInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: FieldInsnNode) {
-        val fieldDesc = fixType(Type.getType(insn.desc)).descriptor
+    fun visitFieldInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: FieldInsnNode, currentClass: String) {
+        val fieldDesc = fixType(Type.getType(insn.desc), currentClass).descriptor
         val isPluginType = fieldDesc != insn.desc
-        val isPluginOwner = isPluginClass(insn.owner)
+        val isPluginOwner = isPluginClass(insn.owner, currentClass)
         if (!isPluginType && !isPluginOwner)
             return
         
@@ -149,8 +149,8 @@ object DynamicInvoker {
         PluginProxy.addRequiredHandle(pluginName, insn.owner, HandleType.fromFieldOpcode(insn.opcode), insn.name, insn.desc)
     }
     
-    fun visitMultiANewArrayInsn(insn: MultiANewArrayInsnNode) {
-        if (isPluginClass(insn.desc))
+    fun visitMultiANewArrayInsn(insn: MultiANewArrayInsnNode, currentClass: String) {
+        if (isPluginClass(insn.desc, currentClass))
             insn.desc = OBJECT_TYPE.internalName
     }
     
@@ -167,11 +167,11 @@ object DynamicInvoker {
                     targetMethod.tag,
                     targetMethod.owner,
                     targetMethod.name,
-                    fixDesc(targetMethod.desc),
+                    fixDesc(targetMethod.desc, currentClass),
                     targetMethod.isInterface
                 )
-                insn.bsmArgs[2] = Type.getType(fixDesc(originalDynamicDesc))
-            } else if (isPluginClass(targetMethod.owner)) {
+                insn.bsmArgs[2] = Type.getType(fixDesc(originalDynamicDesc, currentClass))
+            } else if (isPluginClass(targetMethod.owner, currentClass)) {
                 val interfaceType = insn.bsmArgs[0] as Type
                 iter.set(InvokeDynamicInsnNode(
                     insn.name,
@@ -190,14 +190,14 @@ object DynamicInvoker {
         }
     }
     
-    private fun isPluginClass(internalName: String): Boolean {
-        return minecraftClassPath.getClass(internalName) == null
+    private fun isPluginClass(internalName: String, currentClass: String): Boolean {
+        return minecraftClassPath.getClass(internalName) == null && internalName != currentClass
     }
     
-    private fun fixType(type: Type): Type {
+    private fun fixType(type: Type, currentClass: String): Type {
         return when (type.sort) {
             Type.OBJECT -> {
-                if (isPluginClass(type.internalName)) {
+                if (isPluginClass(type.internalName, currentClass)) {
                     // TODO | this could in theory be optimized to instead search for the first superclass that is not a
                     // TODO | plugin class to support better frame optimizations by the JVM. In turn, this would obviously
                     // TODO | also require to build a class hierarchy for server and default library classes.
@@ -208,7 +208,7 @@ object DynamicInvoker {
             }
             
             Type.ARRAY -> {
-                val elementType = fixType(type.elementType)
+                val elementType = fixType(type.elementType, currentClass)
                 Type.getType("[".repeat(type.dimensions) + elementType.descriptor)
             }
             
@@ -216,9 +216,9 @@ object DynamicInvoker {
         }
     }
     
-    private fun fixDesc(desc: String): String {
-        val returnType = fixType(Type.getReturnType(desc))
-        val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it) }
+    private fun fixDesc(desc: String, currentClass: String): String {
+        val returnType = fixType(Type.getReturnType(desc), currentClass)
+        val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it, currentClass) }
         return Type.getMethodDescriptor(returnType, *argumentTypes.toTypedArray())
     }
     
