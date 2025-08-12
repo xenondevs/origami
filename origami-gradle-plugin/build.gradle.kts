@@ -43,13 +43,16 @@ publishing {
 }
 
 tasks.register("generateVersionFile") {
-    val versionFile = layout.buildDirectory.file("resources/main/version").get().asFile
+    val versionFile = layout.buildDirectory.file("generatedResources/version").get().asFile
+    inputs.property("projectVersion", project.version.toString())
+    outputs.file(versionFile)
+    
     doLast {
         versionFile.parentFile.mkdirs()
         versionFile.writeText(project.version.toString())
     }
 }
 
-tasks.named("processResources") {
-    dependsOn("generateVersionFile")
+tasks.named<ProcessResources>("processResources") {
+    from(tasks.named("generateVersionFile"))
 }
