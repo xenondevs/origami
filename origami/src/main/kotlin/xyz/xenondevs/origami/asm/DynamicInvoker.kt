@@ -35,6 +35,8 @@ object DynamicInvoker {
     
     val METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMetafactory", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
     
+    val SWITCH_BOOTSTRAPS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxySwitch", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+    
     val INSTANCE_OF_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyInstanceOf", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
     val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyClass", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
@@ -193,6 +195,20 @@ object DynamicInvoker {
                     targetMethod.tag
                 ))
                 PluginProxy.addRequiredHandle(pluginName, targetMethod.owner, HandleType.fromTag(targetMethod.tag), targetMethod.name, targetMethod.desc)
+            }
+        } else if (handle.owner == "java/lang/runtime/SwitchBootstraps") {
+            if (handle.name == "typeSwitch") {
+                val types = insn.bsmArgs.map { (it as Type).internalName }
+                if (types.any { isPluginClass(it, currentClass) }) {
+                    iter.set(InvokeDynamicInsnNode(
+                        insn.name,
+                        insn.desc,
+                        SWITCH_BOOTSTRAPS_PROXY_HANDLE,
+                        pluginName,
+                        0,
+                        *types.toTypedArray()
+                    ))
+                }
             }
         }
     }

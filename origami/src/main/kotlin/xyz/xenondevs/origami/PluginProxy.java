@@ -6,10 +6,8 @@ import org.objectweb.asm.Type;
 import xyz.xenondevs.origami.asm.LookupProxy;
 
 import java.lang.invoke.*;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.lang.runtime.SwitchBootstraps;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -163,6 +161,30 @@ public class PluginProxy {
             mh,
             toMethodType(originalDynamicDesc, pluginProxy.lookupClass().getClassLoader())
         );
+    }
+    
+    @SuppressWarnings("unused") // indy to this created by DynamicInvoker
+    public static CallSite proxySwitch(
+        MethodHandles.Lookup caller,
+        String name,
+        MethodType type,
+        String plugin,
+        int isEnum,
+        String... targets
+    ) {
+        try {
+            var lookup = LookupProxy.getLookupFor(plugin);
+            if (isEnum == 1)
+                throw new BootstrapMethodError("Unsupported for now");
+            
+            var targetClasses = new Class<?>[targets.length];
+            for (int i = 0; i < targets.length; i++) {
+                targetClasses[i] = lookup.findClass(targets[i].replace('/', '.'));
+            }
+            return SwitchBootstraps.typeSwitch(lookup, name, type, (Object[]) targetClasses);
+        } catch (Exception e) {
+            throw new BootstrapMethodError("Failed to find classes " + Arrays.toString(targets) + " for switch bootstrap in plugin " + plugin, e);
+        }
     }
     
     @SuppressWarnings("unused") // indy to this created by DynamicInvoker
