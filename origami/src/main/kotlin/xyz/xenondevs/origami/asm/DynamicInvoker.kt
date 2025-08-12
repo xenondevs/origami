@@ -208,7 +208,7 @@ object DynamicInvoker {
         // replace ldc with an indy that will resolve the type at runtime
         iter.set(InvokeDynamicInsnNode(
             "class" + cst.internalName.hashCode(),
-            Type.getMethodDescriptor(OBJECT_TYPE),
+            Type.getMethodDescriptor(CLASS_TYPE),
             CLASS_PROXY_HANDLE,
             pluginName,
             cst.internalName
@@ -250,3 +250,4 @@ object DynamicInvoker {
 }
 
 val OBJECT_TYPE: Type = Type.getType(Object::class.java)
+val CLASS_TYPE: Type = Type.getType(Class::class.java)
