@@ -183,6 +183,23 @@ public class PluginProxy {
         }
     }
     
+    @SuppressWarnings("unused") // indy to this created by DynamicInvoker
+    public static CallSite proxyClass(
+        MethodHandles.Lookup caller,
+        String name,
+        MethodType type,
+        String plugin,
+        String className
+    ) {
+        try {
+            var lookup = LookupProxy.getLookupFor(plugin);
+            var clazz = lookup.findClass(className.replace('/', '.'));
+            return new ConstantCallSite(MethodHandles.constant(Class.class, clazz));
+        } catch (Exception e) {
+            throw new BootstrapMethodError("Failed to find class " + className + " for class proxy in plugin " + plugin, e);
+        }
+    }
+    
     private static ClassHandles checkInitialized(String plugin, String owner) {
         var pluginHandles = PLUGIN_HANDLES.get(plugin);
         if (pluginHandles == null) {

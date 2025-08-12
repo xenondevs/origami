@@ -8,6 +8,7 @@ import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldInsnNode
 import org.objectweb.asm.tree.InsnList
 import org.objectweb.asm.tree.InvokeDynamicInsnNode
+import org.objectweb.asm.tree.LdcInsnNode
 import org.objectweb.asm.tree.MethodInsnNode
 import org.objectweb.asm.tree.MultiANewArrayInsnNode
 import org.objectweb.asm.tree.TypeInsnNode
@@ -36,24 +37,28 @@ object DynamicInvoker {
     
     val INSTANCE_OF_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyInstanceOf", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
+    val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyClass", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+    
     fun transform(clazz: ClassNode, pluginName: String) {
+        val currentMixin = clazz.name
         clazz.methods.forEach { m ->
             val insns = m.instructions
             val iter = insns.iterator()
             while (iter.hasNext()) {
                 when (val insn = iter.next()) {
-                    is TypeInsnNode -> visitTypeInsn(pluginName, insns, iter, insn, clazz.name)
-                    is MethodInsnNode -> visitMethodInsn(pluginName, insns, iter, insn, clazz.name)
-                    is FieldInsnNode -> visitFieldInsn(pluginName, insns, iter, insn, clazz.name)
-                    is MultiANewArrayInsnNode -> visitMultiANewArrayInsn(insn, clazz.name)
-                    is InvokeDynamicInsnNode -> visitInvokeDynamic(pluginName, iter, insn, clazz.name)
+                    is TypeInsnNode -> visitTypeInsn(pluginName, insns, iter, insn, currentMixin)
+                    is MethodInsnNode -> visitMethodInsn(pluginName, insns, iter, insn, currentMixin)
+                    is FieldInsnNode -> visitFieldInsn(pluginName, insns, iter, insn, currentMixin)
+                    is MultiANewArrayInsnNode -> visitMultiANewArrayInsn(insn, currentMixin)
+                    is InvokeDynamicInsnNode -> visitInvokeDynamic(pluginName, iter, insn, currentMixin)
+                    is LdcInsnNode -> visitLdc(pluginName, iter, insn, currentMixin)
                 }
             }
-            m.desc = fixDesc(m.desc, clazz.name)
+            m.desc = fixDesc(m.desc, currentMixin)
         }
         
         clazz.fields.forEach { f ->
-            f.desc = fixType(Type.getType(f.desc), clazz.name).descriptor
+            f.desc = fixType(Type.getType(f.desc), currentMixin).descriptor
         }
     }
     
@@ -190,6 +195,24 @@ object DynamicInvoker {
                 PluginProxy.addRequiredHandle(pluginName, targetMethod.owner, HandleType.fromTag(targetMethod.tag), targetMethod.name, targetMethod.desc)
             }
         }
+    }
+    
+    fun visitLdc(pluginName: String, iter: InsnIterator, insn: LdcInsnNode, currentClass: String) {
+        val cst = insn.cst
+        if (cst !is Type)
+            return
+        
+        if (cst.sort != Type.OBJECT || !isPluginClass(cst.internalName, currentClass))
+            return
+        
+        // replace ldc with an indy that will resolve the type at runtime
+        iter.set(InvokeDynamicInsnNode(
+            "class" + cst.internalName.hashCode(),
+            Type.getMethodDescriptor(OBJECT_TYPE),
+            CLASS_PROXY_HANDLE,
+            pluginName,
+            cst.internalName
+        ))
     }
     
     private fun isPluginClass(internalName: String, currentClass: String): Boolean {
