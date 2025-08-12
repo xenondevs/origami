@@ -44,7 +44,9 @@ publishing {
 
 tasks.register("generateVersionFile") {
     val versionFile = layout.buildDirectory.file("generatedResources/version").get().asFile
+    inputs.property("projectVersion", project.version.toString())
     outputs.file(versionFile)
+    
     doLast {
         versionFile.parentFile.mkdirs()
         versionFile.writeText(project.version.toString())
