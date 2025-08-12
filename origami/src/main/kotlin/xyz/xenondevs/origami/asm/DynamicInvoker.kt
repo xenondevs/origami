@@ -91,8 +91,10 @@ object DynamicInvoker {
     }
     
     fun visitMethodInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: MethodInsnNode, currentClass: String) {
-        if (!isPluginClass(insn.owner, currentClass))
+        if (!isPluginClass(insn.owner, currentClass)) {
+            insn.desc = fixDesc(insn.desc, currentClass)
             return
+        }
         
         val owner = insn.owner
         val name = insn.name
