@@ -95,7 +95,7 @@ public class PluginProxy {
         var key = new HandleKey(isStatic == 1 ? HandleType.STATIC_METHOD : HandleType.VIRTUAL_METHOD, name, desc);
         var mh = classHandles.handles.get(key);
         if (mh == null)
-            throw new BootstrapMethodError("Method call" + name + desc + " in class " + owner + " was not discovered during mixin scanning but is being accessed!");
+            throw new BootstrapMethodError("Method call " + name + desc + " in class " + owner + " was not discovered during mixin scanning but is being accessed!");
         return new ConstantCallSite(mh.asType(type));
     }
     
