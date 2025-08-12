@@ -30,6 +30,10 @@ gradlePlugin {
     }
 }
 
+java {
+    withSourcesJar()
+}
+
 publishing {
     repositories {
         maven {

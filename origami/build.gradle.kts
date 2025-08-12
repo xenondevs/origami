@@ -17,6 +17,10 @@ dependencies {
 
 sourceSets.main { java.setSrcDirs(listOf("src/main/kotlin/")) }
 
+java {
+    withSourcesJar()
+}
+
 publishing {
     publications {
         create<MavenPublication>("maven") {
