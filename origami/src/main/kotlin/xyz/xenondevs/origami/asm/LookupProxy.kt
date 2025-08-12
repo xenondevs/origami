@@ -69,7 +69,7 @@ object LookupProxy {
             })
         }
         
-        val classWriter = PatchClassWriter(Origami.Companion.instance.minecraftClasspath, ClassWriter.COMPUTE_MAXS)
+        val classWriter = PatchClassWriter(Origami.instance.minecraftClasspath, ClassWriter.COMPUTE_MAXS)
         clazz.accept(classWriter)
         return LookupClassDefinition(className, classWriter.toByteArray())
     }
