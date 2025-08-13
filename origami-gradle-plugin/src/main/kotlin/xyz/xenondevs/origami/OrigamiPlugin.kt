@@ -164,7 +164,9 @@ abstract class OrigamiPlugin : Plugin<Project> {
             providers.of(DevBundleValueSource::class) {
                 parameters.getZip().set(bundleZip)
             }
-        val hasDevBundle = configurations.named(DEV_BUNDLE_CONFIG).map { it.allDependencies.isNotEmpty() }
+        
+        @Suppress("ReplaceSizeCheckWithIsNotEmpty") // broken for DependencySet
+        val hasDevBundle = configurations.named(DEV_BUNDLE_CONFIG).map { it.allDependencies.size != 0 }
         val mcVerProvider = devBundleInfo.map(DevBundle::minecraftVersion)
         
         dependencies.addProvider(
@@ -345,5 +347,6 @@ abstract class OrigamiPlugin : Plugin<Project> {
                 }
             }
         }
+        
     }
 }
