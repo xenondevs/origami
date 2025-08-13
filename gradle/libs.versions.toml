@@ -3,7 +3,7 @@ format.version = "1.1"
 
 [versions]
 asm = "9.8"
-kotlin = "2.1.0"
+kotlin = "2.2.0"
 mixin = "0.16.3+mixin.0.8.7"
 mixinextras = "0.5.0"
 
