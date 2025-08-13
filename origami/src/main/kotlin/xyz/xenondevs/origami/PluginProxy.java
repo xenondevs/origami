@@ -7,7 +7,10 @@ import xyz.xenondevs.origami.asm.LookupProxy;
 
 import java.lang.invoke.*;
 import java.lang.runtime.SwitchBootstraps;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -74,7 +77,6 @@ public class PluginProxy {
     }
     
     public static class ClassHandles {
-        private volatile boolean initialized = false;
         private final Set<HandleKey> required = ConcurrentHashMap.newKeySet();
         private final Map<HandleKey, MethodHandle> handles = new ConcurrentHashMap<>();
     }
@@ -231,13 +233,11 @@ public class PluginProxy {
         if (classHandle == null) {
             throw new BootstrapMethodError("Class " + owner + " was not discovered during mixin scanning!");
         }
-        if (!classHandle.initialized) {
-            try {
-                var pluginLookup = LookupProxy.getLookupFor(plugin);
-                pluginLookup.findClass(owner.replace('/', '.'));
-            } catch (Exception e) {
-                throw new BootstrapMethodError("Class " + owner + " can not been initialized yet!", e);
-            }
+        try {
+            var pluginLookup = LookupProxy.getLookupFor(plugin);
+            pluginLookup.findClass(owner.replace('/', '.'));
+        } catch (Exception e) {
+            throw new BootstrapMethodError("Class " + owner + " can not been initialized yet!", e);
         }
         return classHandle;
     }
@@ -265,11 +265,9 @@ public class PluginProxy {
         }
         
         var ch = PLUGIN_HANDLES.get(plugin).get(clazz.getName().replace('.', '/'));
-        var todo = new ArrayList<>(ch.required);
-        todo.forEach(ch.required::remove);
         var loader = clazz.getClassLoader();
         
-        for (var missing : todo) {
+        for (var missing : ch.required) {
             try {
                 var handle = switch (missing.type) {
                     case CONSTRUCTOR -> lookup.findConstructor(clazz, toMethodType(missing.desc, loader));
@@ -285,7 +283,6 @@ public class PluginProxy {
                 throw new IllegalStateException("Failed to initialize handle " + missing.name + missing.desc + " in class " + clazz.getName(), e);
             }
         }
-        ch.initialized = true;
     }
     
     private static MethodType toMethodType(String desc, ClassLoader loader) {
