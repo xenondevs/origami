@@ -5,7 +5,7 @@ import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.CacheableTask
-import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import java.nio.file.Files
@@ -16,16 +16,16 @@ import javax.inject.Inject
 @CacheableTask
 abstract class PrepareOrigamiLoaderTask @Inject constructor()  : DefaultTask() {
     
-    @get:Internal
+    @get:Input
     abstract val origamiLoaderConfig: Property<Configuration>
     
-    @get:Internal
+    @get:Input
     abstract val origamiConfig: Property<Configuration>
     
-    @get:Internal
+    @get:Input
     abstract val version: Property<String>
     
-    @get:Internal
+    @get:Input
     abstract val libsFolder: Property<String>
     
     @get:OutputDirectory

@@ -12,7 +12,7 @@ plugins {
 
 subprojects {
     group = "xyz.xenondevs.origami"
-    version = "0.1.1"
+    version = "0.1.2"
     
     apply(plugin = "kotlin")
     repositories { configureRepos() }
