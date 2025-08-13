@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -77,6 +78,7 @@ public class PluginProxy {
     }
     
     public static class ClassHandles {
+        private final CompletableFuture<Boolean> initialized = new CompletableFuture<>();
         private final Set<HandleKey> required = ConcurrentHashMap.newKeySet();
         private final Map<HandleKey, MethodHandle> handles = new ConcurrentHashMap<>();
     }
@@ -236,6 +238,8 @@ public class PluginProxy {
         try {
             var pluginLookup = LookupProxy.getLookupFor(plugin);
             pluginLookup.findClass(owner.replace('/', '.'));
+            if (!classHandle.initialized.get()) // waits for initialization to complete (other thread might be initializing it)
+                throw new BootstrapMethodError("Handles of " + owner + " from " + plugin + " failed initialization!");
         } catch (Exception e) {
             throw new BootstrapMethodError("Class " + owner + " can not been initialized yet!", e);
         }
@@ -267,8 +271,8 @@ public class PluginProxy {
         var ch = PLUGIN_HANDLES.get(plugin).get(clazz.getName().replace('.', '/'));
         var loader = clazz.getClassLoader();
         
-        for (var missing : ch.required) {
-            try {
+        try {
+            for (var missing : ch.required) {
                 var handle = switch (missing.type) {
                     case CONSTRUCTOR -> lookup.findConstructor(clazz, toMethodType(missing.desc, loader));
                     case VIRTUAL_METHOD -> lookup.findVirtual(clazz, missing.name, toMethodType(missing.desc, loader));
@@ -278,10 +282,13 @@ public class PluginProxy {
                     case VIRTUAL_SETTER -> lookup.findSetter(clazz, missing.name, toClass(missing.desc, loader));
                     case STATIC_SETTER -> lookup.findStaticSetter(clazz, missing.name, toClass(missing.desc, loader));
                 };
-                ch.handles.put(missing, handle);
-            } catch (NoSuchMethodException | IllegalAccessException | NoSuchFieldException | ClassNotFoundException e) {
-                throw new IllegalStateException("Failed to initialize handle " + missing.name + missing.desc + " in class " + clazz.getName(), e);
+                ch.handles.putIfAbsent(missing, handle);
             }
+            
+            ch.initialized.complete(true);
+        } catch (NoSuchMethodException | IllegalAccessException | NoSuchFieldException | ClassNotFoundException e) {
+            ch.initialized.complete(false);
+            throw new IllegalStateException("Failed to initialize handles in class " + clazz.getName() + ", required: \n" + ch.required, e);
         }
     }
     
