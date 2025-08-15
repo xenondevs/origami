@@ -9,8 +9,8 @@ import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
 import xyz.xenondevs.origami.extension.OrigamiExtension
 import xyz.xenondevs.origami.extension.OrigamiJarExtension
-import xyz.xenondevs.origami.task.PrepareOrigamiLoaderTask
-import xyz.xenondevs.origami.task.PrepareOrigamiMarkerTask
+import xyz.xenondevs.origami.task.build.PrepareOrigamiLoaderTask
+import xyz.xenondevs.origami.task.build.PrepareOrigamiMarkerTask
 
 fun Project.registerPackagingTasks() {
     val ext = this.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)

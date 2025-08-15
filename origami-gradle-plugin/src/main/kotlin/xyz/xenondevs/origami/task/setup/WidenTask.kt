@@ -1,4 +1,4 @@
-package xyz.xenondevs.origami.task
+package xyz.xenondevs.origami.task.setup
 
 import com.github.javaparser.JavaParser
 import com.github.javaparser.ParserConfiguration

@@ -4,7 +4,7 @@ import org.gradle.api.Project
 import org.gradle.api.file.FileCollection
 import org.gradle.kotlin.dsl.named
 import xyz.xenondevs.origami.DEV_BUNDLE_COMPILE_CLASSPATH
-import xyz.xenondevs.origami.task.WidenTask
+import xyz.xenondevs.origami.task.setup.WidenTask
 import javax.inject.Inject
 
 abstract class OrigamiDependenciesExtension @Inject constructor(private val project: Project) {

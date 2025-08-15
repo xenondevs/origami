@@ -1,4 +1,4 @@
-package xyz.xenondevs.origami.task
+package xyz.xenondevs.origami.task.setup
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty

@@ -1,4 +1,4 @@
-package xyz.xenondevs.origami.task
+package xyz.xenondevs.origami.task.setup
 
 import io.codechicken.diffpatch.cli.PatchOperation
 import io.codechicken.diffpatch.util.Input.ArchiveMultiInput

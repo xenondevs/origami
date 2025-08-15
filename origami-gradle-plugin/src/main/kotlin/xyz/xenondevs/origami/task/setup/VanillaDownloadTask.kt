@@ -1,4 +1,4 @@
-package xyz.xenondevs.origami.task
+package xyz.xenondevs.origami.task.setup
 
 import com.google.gson.JsonObject
 import org.gradle.api.DefaultTask
