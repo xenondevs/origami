@@ -4,7 +4,6 @@ import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Provider
 import org.gradle.jvm.toolchain.JavaLanguageVersion
-import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.maven
@@ -16,16 +15,19 @@ import xyz.xenondevs.origami.service.DownloaderService
 import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.task.setup.ApplyPaperPatchesTask
 import xyz.xenondevs.origami.task.setup.DecompileTask
+import xyz.xenondevs.origami.task.setup.InstallPatchedServerTask
+import xyz.xenondevs.origami.task.setup.PatchServerTask
 import xyz.xenondevs.origami.task.setup.RemapTask
 import xyz.xenondevs.origami.task.setup.VanillaDownloadTask
-import xyz.xenondevs.origami.task.setup.WidenTask
 import xyz.xenondevs.origami.value.DevBundle
 import xyz.xenondevs.origami.value.DevBundleValueSource
 import xyz.xenondevs.origami.value.MacheConfigValueSource
 import java.io.File
 
-fun Project.registerTasks(dl: Provider<DownloaderService>, javaToolchainService: JavaToolchainService) {
+fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin) {
     fun Provider<File>.toRegular() = layout.file(this)
+    
+    val javaToolchainService = plugin.javaToolchainService
     
     val bundleZip = configurations.named(DEV_BUNDLE_CONFIG).map { it.singleFile }.toRegular()
     val macheZip = configurations.named(MACHE_CONFIG).map { it.singleFile }.toRegular()
@@ -157,7 +159,7 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, javaToolchainService:
         patchedSources.set(workDir.map { it.dir("patched-sources") })
     }
     
-    val widenMerge = tasks.register<WidenTask>("_oriWiden") {
+    val widenMerge = tasks.register<PatchServerTask>("_oriWiden") {
         onlyIf { hasDevBundle.get() }
         
         accessWidenerFile.set(ext.pluginId
@@ -176,15 +178,26 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, javaToolchainService:
         outputSourcesJar.set(workDir.map { it.file("paper-server-widened-sources.jar") })
     }
     
+    val install = tasks.register<InstallPatchedServerTask>("_oriInstall") {
+        onlyIf { hasDevBundle.get() }
+        
+        localRepo.set(plugin.localRepo)
+        paperClasspathConfig.set(project.configurations.named(DEV_BUNDLE_COMPILE_CLASSPATH))
+        artifact.set("widened-server-${project.name}")
+        version.set(ext.devBundleVersion)
+        classesJar.set(widenMerge.flatMap(PatchServerTask::outputClassesJar))
+        sourcesJar.set(widenMerge.flatMap(PatchServerTask::outputSourcesJar))
+    }
+    
     afterEvaluate {
         if (!hasDevBundle.get()) return@afterEvaluate
         
         gradle.projectsEvaluated {
-//            val importTask = tasks.findByName("prepareKotlinBuildScriptModel")
-//                ?: tasks.findByName("ideaModule")
-//                ?: tasks.findByName("eclipseClasspath")
-//
-//            importTask?.dependsOn(widenMerge)
+            val importTask = tasks.findByName("prepareKotlinBuildScriptModel")
+                ?: tasks.findByName("ideaModule")
+                ?: tasks.findByName("eclipseClasspath")
+
+            importTask?.dependsOn(install)
         }
         
         val cfg = macheConfig.get()

@@ -1,27 +1,36 @@
 package xyz.xenondevs.origami.extension
 
 import org.gradle.api.Project
-import org.gradle.api.file.FileCollection
+import org.gradle.api.artifacts.ExternalModuleDependency
+import org.gradle.api.provider.Provider
+import org.gradle.kotlin.dsl.maven
 import org.gradle.kotlin.dsl.named
-import xyz.xenondevs.origami.DEV_BUNDLE_COMPILE_CLASSPATH
-import xyz.xenondevs.origami.task.setup.WidenTask
-import javax.inject.Inject
+import org.gradle.kotlin.dsl.repositories
+import xyz.xenondevs.origami.OrigamiPlugin
+import xyz.xenondevs.origami.task.setup.InstallPatchedServerTask
 
-abstract class OrigamiDependenciesExtension @Inject constructor(private val project: Project) {
+abstract class OrigamiDependenciesExtension(
+    private val project: Project,
+    private val plugin: OrigamiPlugin
+) {
     
-    fun patchedPaperServer(): FileCollection {
-        val widenTask = project.tasks.named<WidenTask>("_oriWiden")
-        val classpathConfig = project.configurations.named(DEV_BUNDLE_COMPILE_CLASSPATH)
-
-        val classesJar = widenTask.flatMap(WidenTask::outputClassesJar)
-        val sourcesJar = widenTask.flatMap(WidenTask::outputSourcesJar)
-        val libs = classpathConfig.flatMap { config -> project.provider { project.files(config.files) } }
-
-        val files = project.objects.fileCollection()
-            .from(classesJar, sourcesJar, libs)
-            .builtBy(widenTask)
-
-        return files
+    fun patchedPaperServer(): Provider<ExternalModuleDependency> {
+        val installTask = project.tasks.named<InstallPatchedServerTask>("_oriInstall")
+        
+        project.repositories {
+            maven(plugin.localRepo.folder.get().asFile.toPath()) {
+                content { includeGroup("xyz.xenondevs.origami.patched-server") }
+            }
+        }
+        
+        val notation = installTask.flatMap {
+            it.artifact.zip(it.version) { artifact, version -> "xyz.xenondevs.origami.patched-server:$artifact:$version" }
+        }
+        val dep = notation.map {
+            (project.dependencies.create(it) as ExternalModuleDependency)
+        }
+        
+        return dep
     }
     
 }

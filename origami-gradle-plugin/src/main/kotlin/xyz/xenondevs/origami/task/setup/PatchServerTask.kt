@@ -55,7 +55,7 @@ import kotlin.time.Duration.Companion.milliseconds
 
 // TODO: include craftbukkit sources
 @CacheableTask
-abstract class WidenTask @Inject constructor() : DefaultTask() {
+abstract class PatchServerTask @Inject constructor() : DefaultTask() {
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NAME_ONLY)

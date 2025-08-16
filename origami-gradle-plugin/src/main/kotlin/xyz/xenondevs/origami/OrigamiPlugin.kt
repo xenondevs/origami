@@ -3,8 +3,11 @@ package xyz.xenondevs.origami
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.jvm.toolchain.JavaToolchainService
+import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.registerIfAbsent
+import xyz.xenondevs.origami.extension.OrigamiExtension
 import xyz.xenondevs.origami.service.DownloaderService
+import xyz.xenondevs.origami.util.TinyMavenRepo
 import javax.inject.Inject
 
 internal const val DEV_BUNDLE_CONFIG = "paperweightDevelopmentBundle"
@@ -25,13 +28,18 @@ abstract class OrigamiPlugin : Plugin<Project> {
     @get:Inject
     abstract val javaToolchainService: JavaToolchainService
     
+    lateinit var localRepo: TinyMavenRepo
+    
     override fun apply(target: Project) {
         val dl = target.gradle.sharedServices.registerIfAbsent("origamiDownloader", DownloaderService::class)
         
         target.plugins.apply("java")
         target.registerConfigurations()
-        target.registerExtensions()
-        target.registerTasks(dl, javaToolchainService)
+        target.registerExtensions(this)
+        val ext = target.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)
+        localRepo = TinyMavenRepo(ext.cache.dir("local-repo"))
+        
+        target.registerTasks(dl, this)
         target.registerPackagingTasks()
         target.registerPackagingExtensions()
     }

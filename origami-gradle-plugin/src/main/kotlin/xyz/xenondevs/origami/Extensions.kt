@@ -7,7 +7,7 @@ import org.gradle.kotlin.dsl.getByName
 import xyz.xenondevs.origami.extension.OrigamiDependenciesExtension
 import xyz.xenondevs.origami.extension.OrigamiExtension
 
-internal fun Project.registerExtensions() {
+internal fun Project.registerExtensions(plugin: OrigamiPlugin) {
     val oriExt = extensions.create<OrigamiExtension>(ORIGAMI_EXTENSION)
     oriExt.pluginId.convention(name)
     
@@ -16,7 +16,7 @@ internal fun Project.registerExtensions() {
     }
     dependencies.addProvider(DEV_BUNDLE_CONFIG, devBundleNotation)
     dependencies.addProvider(DEV_BUNDLE_COMPILE_CLASSPATH, devBundleNotation)
-    dependencies.extensions.create<OrigamiDependenciesExtension>(ORIGAMI_EXTENSION, this)
+    dependencies.extensions.create<OrigamiDependenciesExtension>(ORIGAMI_EXTENSION, this, plugin)
     
     tasks.getByName<Delete>("clean") {
         delete(oriExt.cache)
