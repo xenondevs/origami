@@ -198,6 +198,11 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
                 ?: tasks.findByName("eclipseClasspath")
 
             importTask?.dependsOn(install)
+            
+            tasks.findByName("compileJava")?.dependsOn(install)
+            tasks.findByName("compileTestJava")?.dependsOn(install)
+            tasks.findByName("compileKotlin")?.dependsOn(install)
+            tasks.findByName("compileTestKotlin")?.dependsOn(install)
         }
         
         val cfg = macheConfig.get()
