@@ -3,8 +3,8 @@ package xyz.xenondevs.origami.extension
 import org.gradle.jvm.tasks.Jar
 import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.getByName
-import xyz.xenondevs.origami.task.build.PrepareOrigamiLoaderTask
-import xyz.xenondevs.origami.task.build.PrepareOrigamiMarkerTask
+import xyz.xenondevs.origami.task.packaging.PrepareOrigamiLoaderTask
+import xyz.xenondevs.origami.task.packaging.PrepareOrigamiMarkerTask
 
 abstract class OrigamiJarExtension(private val jar: Jar) {
     
