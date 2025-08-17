@@ -24,7 +24,7 @@ object TransformerRegistry {
         if (toTransform.isEmpty())
             return bytecode
         
-        val classTransformers = toTransform.remove(name) ?: return bytecode
+        val classTransformers = toTransform.get(name) ?: return bytecode
         return transformUnchecked(bytecode, name, classTransformers)
     }
     
