@@ -54,7 +54,7 @@ public class OrigamiAgent {
                 var libName = entry.split("/", 3)[2];
                 var libFile = new File("libraries/" + libName);
                 urls.add(libFile.toURI().toURL());
-//                if (libFile.exists()) continue;
+                if (libFile.exists()) continue;
                 libFile.getParentFile().mkdirs();
                 
                 try (var libStream = OrigamiAgent.class.getResourceAsStream(entry)) {
