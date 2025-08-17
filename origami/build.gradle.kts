@@ -1,7 +1,6 @@
 plugins {
-    id("java")
-    `maven-publish`
     alias(libs.plugins.kotlin)
+    `maven-publish`
 }
 
 dependencies {

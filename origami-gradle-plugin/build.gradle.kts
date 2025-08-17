@@ -1,4 +1,5 @@
 plugins {
+    alias(libs.plugins.kotlin)
     `kotlin-dsl`
     `maven-publish`
 }

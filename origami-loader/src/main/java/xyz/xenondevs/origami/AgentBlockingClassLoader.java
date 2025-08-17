@@ -1,7 +1,5 @@
 package xyz.xenondevs.origami;
 
-import org.jetbrains.annotations.Nullable;
-
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -65,7 +63,6 @@ public class AgentBlockingClassLoader extends URLClassLoader {
         }
     }
     
-    @Nullable
     @Override
     public URL getResource(String name) {
         URL resource = super.getResource(name);

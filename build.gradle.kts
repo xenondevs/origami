@@ -14,7 +14,6 @@ subprojects {
     group = "xyz.xenondevs.origami"
     version = "0.1.2"
     
-    apply(plugin = "kotlin")
     repositories { configureRepos() }
     
     tasks {
