@@ -25,7 +25,7 @@ class WriteOnlyArrayList<T> : ArrayList<T>() {
     }
     
     override fun removeIf(filter: Predicate<in T>): Boolean {
-        return super.removeIf(filter)
+        throwUnsupported()
     }
     
     override fun removeAt(index: Int): T {
