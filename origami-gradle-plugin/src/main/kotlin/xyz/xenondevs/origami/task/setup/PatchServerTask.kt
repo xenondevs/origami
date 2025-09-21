@@ -27,12 +27,16 @@ import net.fabricmc.accesswidener.AccessWidener
 import net.fabricmc.accesswidener.AccessWidenerClassVisitor
 import net.fabricmc.accesswidener.AccessWidenerReader
 import net.fabricmc.accesswidener.ForwardingVisitor
+import net.fabricmc.accesswidener.TransitiveOnlyFilter
 import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
@@ -61,6 +65,10 @@ abstract class PatchServerTask @Inject constructor() : DefaultTask() {
     @get:PathSensitive(PathSensitivity.NAME_ONLY)
     @get:Optional
     abstract val accessWidenerFile: RegularFileProperty
+    
+    @get:InputFiles
+    @get:Classpath
+    abstract val transitiveAccessWidenerSources: ConfigurableFileCollection
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
@@ -100,7 +108,7 @@ abstract class PatchServerTask @Inject constructor() : DefaultTask() {
         val sourcesOut = ZipOutputStream(tempSourcesOut.outputStream().buffered())
         
         try {
-            if (aw != null) {
+            if (!aw.isEmpty()) {
                 logger.lifecycle("Applying access widener to server classes and sources")
                 val start = System.currentTimeMillis()
                 processClasses(classesIn, classesOut, aw)
@@ -125,13 +133,34 @@ abstract class PatchServerTask @Inject constructor() : DefaultTask() {
         Files.move(tempSourcesOut.toPath(), outputSourcesJar.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
     
-    fun parseAccessWidener(): ProjectAccessWidener? {
-        if (!accessWidenerFile.isPresent) return null
-        val file = accessWidenerFile.get().asFile
-        
+    fun parseAccessWidener(): ProjectAccessWidener {
         val accessWidener = AccessWidener()
         val config = AccessWidenerConfig()
-        file.bufferedReader().use { reader -> AccessWidenerReader(ForwardingVisitor(config, accessWidener)).read(reader) }
+        
+        if (accessWidenerFile.isPresent) {
+            val projectAw = accessWidenerFile.asFile.get()
+            logger.info("Using project access wideners from ${projectAw.name}")
+            projectAw.bufferedReader().use { reader ->
+                val awr = AccessWidenerReader(ForwardingVisitor(config, accessWidener))
+                awr.read(reader)
+            }
+        } else {
+            logger.info("No project access wideners configured")
+        }
+        
+        transitiveAccessWidenerSources.asSequence()
+            .filter { file -> file.extension.equals("jar", true) }
+            .forEach { jarFile ->
+                ZipInputStream(jarFile.inputStream().buffered()).use { zin ->
+                    generateSequence { zin.nextEntry }
+                        .filter { entry -> entry.name.endsWith(".accesswidener", true) }
+                        .forEach { entry ->
+                            logger.info("Using transitive access wideners from ${jarFile.name} (${entry.name})")
+                            val awr = AccessWidenerReader(TransitiveOnlyFilter(ForwardingVisitor(config, accessWidener)))
+                            awr.read(zin.bufferedReader())
+                        }
+                }
+            }
         
         return ProjectAccessWidener(config, accessWidener)
     }

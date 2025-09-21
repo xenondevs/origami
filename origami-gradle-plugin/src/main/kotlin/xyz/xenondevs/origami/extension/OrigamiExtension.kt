@@ -1,10 +1,13 @@
 package xyz.xenondevs.origami.extension
 
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.ProjectLayout
 import org.gradle.api.invocation.Gradle
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
+import org.gradle.kotlin.dsl.setProperty
 import javax.inject.Inject
 
 abstract class OrigamiExtension @Inject constructor(
@@ -20,11 +23,14 @@ abstract class OrigamiExtension @Inject constructor(
     //       the project name.
     val pluginId: Property<String> = objects.property(String::class.java)
     
-    val devBundleGroup   : Property<String> = objects.property(String::class.java)
+    val devBundleGroup: Property<String> = objects.property(String::class.java)
         .convention("io.papermc.paper")
     val devBundleArtifact: Property<String> = objects.property(String::class.java)
         .convention("dev-bundle")
-    val devBundleVersion : Property<String> = objects.property(String::class.java)
+    val devBundleVersion: Property<String> = objects.property(String::class.java)
+    
+    val transitiveAccessWidenerConfigurations: SetProperty<Configuration> = objects.setProperty<Configuration>()
+        .convention(emptySet())
     
     fun paperDevBundle(
         version: String,

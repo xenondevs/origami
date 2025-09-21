@@ -14,6 +14,8 @@ data class ProjectAccessWidener(
     val accessWidener: AccessWidener
 ) {
     
+    fun isEmpty(): Boolean = accessWidener.targets.isEmpty()
+    
     fun hasClass(name: String): Boolean {
         return accessWidener.targets.contains(
             name

@@ -166,6 +166,11 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
             .map { id -> layout.projectDirectory.file("src/main/resources/$id.accesswidener") }
             .filter { it.asFile.exists() }
         )
+        transitiveAccessWidenerSources.from(
+            ext.transitiveAccessWidenerConfigurations.map { cfgs ->
+                cfgs.flatMap { cfg -> cfg.incoming.artifacts.artifactFiles }
+            }
+        )
         sourcesJar.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedJar))
         newSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::newSources))
         patchedSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedSources))
@@ -196,7 +201,7 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
             val importTask = tasks.findByName("prepareKotlinBuildScriptModel")
                 ?: tasks.findByName("ideaModule")
                 ?: tasks.findByName("eclipseClasspath")
-
+            
             importTask?.dependsOn(install)
             
             tasks.findByName("compileJava")?.dependsOn(install)
