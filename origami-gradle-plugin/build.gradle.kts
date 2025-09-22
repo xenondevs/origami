@@ -35,6 +35,12 @@ java {
     withSourcesJar()
 }
 
+kotlin {
+    compilerOptions {
+        optIn.add("kotlin.time.ExperimentalTime")
+    }
+}
+
 publishing {
     repositories {
         maven {

@@ -1,44 +1,29 @@
 package xyz.xenondevs.origami.util
 
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
+import java.io.File
 import java.nio.file.Files
-import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import javax.xml.XMLConstants
 import javax.xml.stream.XMLOutputFactory
 import javax.xml.stream.XMLStreamWriter
+import kotlin.text.split
 
 class TinyMavenRepo(
     val folder: Provider<Directory>,
 ) {
     
-    fun installArtifact(
+    fun installPom(
         group: String,
         name: String,
         version: String,
-        file: Path,
-        dependencies: List<String> = emptyList(),
-        sources: Path? = null,
+        dependencies: List<ModuleComponentIdentifier> = emptyList()
     ) {
-        val repoFolder = folder.get().asFile.toPath()
-        
-        val groupPath = group.replace('.', '/')
-        val artifactPath = "$groupPath/$name/$version/${name}-${version}.jar"
-        val sourcesPath = "$groupPath/$name/$version/${name}-${version}-sources.jar"
-        val targetFile = repoFolder.resolve(artifactPath)
-        val sourcesFile = repoFolder.resolve(sourcesPath)
-        val pomFile = targetFile.resolveSibling("${name}-${version}.pom")
-        
-        Files.createDirectories(targetFile.parent)
-        Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING)
-        if (sources != null) {
-            Files.copy(sources, sourcesFile, StandardCopyOption.REPLACE_EXISTING)
-        } else {
-            Files.deleteIfExists(sourcesFile)
-        }
-        
-        pomFile.toFile().outputStream().buffered().use { out ->
+        val pom = resolve(group, name, version, ".pom")
+        pom.parentFile.mkdirs()
+        pom.outputStream().buffered().use { out ->
             val writer = XMLOutputFactory.newInstance().createXMLStreamWriter(out)
             
             writer.writeStartDocument("UTF-8", "1.0")
@@ -54,8 +39,7 @@ class TinyMavenRepo(
             writer.writeStartElement("dependencies")
             for (dep in dependencies) {
                 writer.writeStartElement("dependency")
-                val (depGroup, depArtifact, depVersion) = dep.split(':', limit = 3)
-                writer.writeCoordinates(depGroup, depArtifact, depVersion)
+                writer.writeCoordinates(dep.group, dep.module, dep.version)
                 writer.writeEndElement()
             }
             writer.writeEndElement()
@@ -65,7 +49,23 @@ class TinyMavenRepo(
         }
     }
     
+    fun installJarArtifact(
+        group: String,
+        name: String,
+        version: String,
+        classifier: String?,
+        file: File,
+    ) {
+        val suffix = if (classifier != null) "-$classifier.jar" else ".jar"
+        val targetFile = resolve(group, name, version, suffix)
+        targetFile.parentFile.mkdirs()
+        file.copyTo(targetFile, true)
+    }
     
+    private fun resolve(group: String, name: String, version: String, suffix: String): File {
+        val path = "${group.replace('.', '/')}/$name/$version/$name-$version$suffix"
+        return folder.get().asFile.resolve(path)
+    }
     
     private fun XMLStreamWriter.writeElement(name: String, value: String) {
         writeStartElement(name)
