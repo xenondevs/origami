@@ -3,7 +3,10 @@ package xyz.xenondevs.origami
 import org.gradle.api.Project
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.Delete
+import org.gradle.jvm.tasks.Jar
 import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.kotlin.dsl.attributes
 import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.maven
@@ -192,6 +195,10 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
         version.set(ext.devBundleVersion)
         classesJar.set(widenMerge.flatMap(PatchServerTask::outputClassesJar))
         sourcesJar.set(widenMerge.flatMap(PatchServerTask::outputSourcesJar))
+    }
+    
+    tasks.register<Delete>("_oriClean") {
+        delete(ext.cache)
     }
     
     afterEvaluate {

@@ -17,8 +17,4 @@ internal fun Project.registerExtensions(plugin: OrigamiPlugin) {
     dependencies.addProvider(DEV_BUNDLE_CONFIG, devBundleNotation)
     dependencies.addProvider(DEV_BUNDLE_COMPILE_CLASSPATH, devBundleNotation)
     dependencies.extensions.create<OrigamiDependenciesExtension>(ORIGAMI_EXTENSION, this, plugin)
-    
-    tasks.getByName<Delete>("clean") {
-        delete(oriExt.cache)
-    }
 }
