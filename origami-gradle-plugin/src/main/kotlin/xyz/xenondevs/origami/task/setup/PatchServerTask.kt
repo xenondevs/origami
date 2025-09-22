@@ -23,6 +23,7 @@ import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSol
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JarTypeSolver
 import com.github.javaparser.symbolsolver.resolution.typesolvers.JavaParserTypeSolver
 import com.github.javaparser.symbolsolver.resolution.typesolvers.ReflectionTypeSolver
+import javassist.ClassPool
 import net.fabricmc.accesswidener.AccessWidener
 import net.fabricmc.accesswidener.AccessWidenerClassVisitor
 import net.fabricmc.accesswidener.AccessWidenerReader
@@ -202,6 +203,9 @@ abstract class PatchServerTask @Inject constructor() : DefaultTask() {
         out: ZipOutputStream,
         projectConfig: ProjectAccessWidener
     ) {
+        // fixes file handles to vanilla libraries not being closed
+        ClassPool.cacheOpenedJarFile = false
+        
         val config = projectConfig.config
         
         // This allows multiple things:
