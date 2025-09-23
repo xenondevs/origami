@@ -22,16 +22,16 @@ import java.net.URLClassLoader
  */
 object PaperclipPatcher {
     
-    fun patch(instrumentation: Instrumentation) {
-        val node = getPaperclipNode()
+    fun patch(instrumentation: Instrumentation, appClassLoader: ClassLoader) {
+        val node = getPaperclipNode(appClassLoader)
         patchMain(node)
         val bytecode = node.assemble()
-        val paperclipClass = Class.forName("io.papermc.paperclip.Paperclip")
+        val paperclipClass = appClassLoader.loadClass("io.papermc.paperclip.Paperclip")
         instrumentation.redefineClasses(ClassDefinition(paperclipClass, bytecode))
     }
     
-    fun getPaperclipNode(): ClassNode {
-        val bytes = javaClass.getResourceAsStream("/io/papermc/paperclip/Paperclip.class")?.use(InputStream::readBytes)
+    fun getPaperclipNode(appClassLoader: ClassLoader): ClassNode {
+        val bytes = appClassLoader.getResourceAsStream("io/papermc/paperclip/Paperclip.class")?.use(InputStream::readBytes)
             ?: throw IllegalStateException("Paperclip class not found")
         
         val node = ClassNode()

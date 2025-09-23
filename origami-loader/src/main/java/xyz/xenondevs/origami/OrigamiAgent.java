@@ -8,6 +8,7 @@ import java.lang.instrument.Instrumentation;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
@@ -28,16 +29,16 @@ public class OrigamiAgent {
     
     public static void premain(String agentArgs, Instrumentation instrumentation) throws Throwable {
         // In case a server admin specifies multiple plugins with Origami as agents
-        // TODO: still add the agents classloader to origami.agent.url to still block class access
         if (Boolean.getBoolean("origami.agent.loaded")) {
             return;
         }
         System.setProperty("origami.agent.loaded", "true");
         
         var classpath = buildClasspath();
-        origamiLoader = new AgentBlockingClassLoader(classpath.toArray(new URL[0]), OrigamiAgent.class.getClassLoader());
+        origamiLoader = new URLClassLoader(classpath.toArray(new URL[0]), OrigamiAgent.class.getClassLoader().getParent());
         var origamiClass = Class.forName("xyz.xenondevs.origami.Origami", true, origamiLoader);
-        origami = origamiClass.getConstructor(Instrumentation.class).newInstance(instrumentation);
+        origami = origamiClass.getConstructor(Instrumentation.class, ClassLoader.class)
+            .newInstance(instrumentation, OrigamiAgent.class.getClassLoader());
     }
     
     public static ArrayList<URL> buildClasspath() {

@@ -13,10 +13,12 @@ import xyz.xenondevs.origami.transformer.runtime.TransformerRegistry
 import xyz.xenondevs.origami.util.WriteOnlyArrayList
 import java.lang.instrument.Instrumentation
 import java.net.JarURLConnection
+import java.net.URI
 import java.net.URL
 
 class Origami(
     val instrumentation: Instrumentation,
+    appClassLoader: ClassLoader
 ) {
     
     lateinit var minecraftLoader: PatchingClassLoader
@@ -24,7 +26,7 @@ class Origami(
     lateinit var minecraftClasspath: LazyClassPath
     
     init {
-        PaperclipPatcher.patch(instrumentation)
+        PaperclipPatcher.patch(instrumentation, appClassLoader)
     }
     
     @Suppress("unused") // call is injected by Origami

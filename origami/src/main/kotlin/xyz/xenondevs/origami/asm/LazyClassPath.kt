@@ -2,7 +2,6 @@ package xyz.xenondevs.origami.asm
 
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
-import xyz.xenondevs.origami.AgentBlockingClassLoader
 import xyz.xenondevs.origami.util.WriteOnlyArrayList
 import java.io.BufferedInputStream
 import java.util.*
@@ -55,11 +54,9 @@ class LazyClassPath(val files: WriteOnlyArrayList<JarFile>, private val includeA
         }
         
         if (stream == null) {
-            val resource = ClassLoader.getSystemResource(entryName)
+            val resource = ClassLoader.getSystemClassLoader().parent.getResource(entryName)
                 ?: javaClass.classLoader.getResource(entryName)
-            if (!AgentBlockingClassLoader.isFromAgent(resource)) {
-                stream = resource?.openStream()?.buffered()
-            }
+            stream = resource?.openStream()?.buffered()
         }
         
         if (stream == null) {
