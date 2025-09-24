@@ -100,11 +100,7 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
             .map { id -> layout.projectDirectory.file("src/main/resources/$id.accesswidener") }
             .filter { it.asFile.exists() }
         )
-        transitiveAccessWidenerSources.from(
-            ext.transitiveAccessWidenerConfigurations.map { cfgs ->
-                cfgs.flatMap { cfg -> cfg.incoming.artifacts.artifactFiles }
-            }
-        )
+        transitiveAccessWidenerSources.from(ext.transitiveAccessWidenerSources)
     }
     
     val installPom = tasks.register<InstallTask.Pom>("_oriInstallPom") {

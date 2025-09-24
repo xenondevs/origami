@@ -30,8 +30,12 @@ abstract class OrigamiExtension @Inject constructor(
         .convention("dev-bundle")
     val devBundleVersion: Property<String> = objects.property<String>()
     
-    val transitiveAccessWidenerConfigurations: SetProperty<Configuration> = objects.setProperty<Configuration>()
-        .convention(emptySet())
+    /**
+     * A collection of files from which transitive access wideners should be read and applied.
+     * 
+     * Defaults to none.
+     */
+    val transitiveAccessWidenerSources: ConfigurableFileCollection = objects.fileCollection()
     
     /**
      * The input fils sto be used for the `origamiJar` task.
