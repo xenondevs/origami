@@ -5,7 +5,6 @@ import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.maven
 import org.gradle.kotlin.dsl.named
-import org.gradle.kotlin.dsl.repositories
 import xyz.xenondevs.origami.OrigamiPlugin
 import xyz.xenondevs.origami.task.setup.InstallTask
 
@@ -17,11 +16,11 @@ abstract class OrigamiDependenciesExtension(
     fun patchedPaperServer(): Provider<ExternalModuleDependency> {
         val installTask = project.tasks.named<InstallTask>("_oriInstallJar")
         
-        project.repositories {
-            maven(plugin.localRepo.folder.get().asFile.toPath()) {
-                content { includeGroup("xyz.xenondevs.origami.patched-server") }
-            }
+        val repo = project.repositories.maven(plugin.localRepo.folder.get().asFile.toPath()) {
+            content { includeGroup("xyz.xenondevs.origami.patched-server") }
         }
+        project.repositories.remove(repo)
+        project.repositories.add(0, repo)
         
         val notation = installTask.flatMap {
             it.name.zip(it.version) { artifact, version -> "xyz.xenondevs.origami.patched-server:$artifact:$version" }
