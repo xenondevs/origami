@@ -77,7 +77,7 @@ abstract class DecompileTask @Inject constructor() : DefaultTask() {
             add(tempOut.absolutePath)
         }
         val decompilerLog = temporaryDir.resolve("decompiler.log")
-        logger.lifecycle("Decompiling vanilla $mcVer server")
+        logger.info("Decompiling vanilla $mcVer server")
         val start = System.currentTimeMillis()
         val process = ProcessBuilder(
             javaLauncher.get().executablePath.asFile.absolutePath,
@@ -110,7 +110,7 @@ abstract class DecompileTask @Inject constructor() : DefaultTask() {
         check(fixedOut.exists()) { "Failed to apply mache patches, fixed jar not found at ${fixedOut.absolutePath}" }
         
         Files.move(fixedOut.toPath(), decompiledSources.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        logger.lifecycle("Decompiled server in ${(System.currentTimeMillis() - start).milliseconds}")
+        logger.info("Decompiled server in ${(System.currentTimeMillis() - start).milliseconds}")
     }
     
 }

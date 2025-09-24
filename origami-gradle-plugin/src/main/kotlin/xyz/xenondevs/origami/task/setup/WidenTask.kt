@@ -84,9 +84,10 @@ abstract class WidenTask : DefaultTask() {
         try {
             if (!aw.isEmpty()) {
                 val time = measureTime { process(aw, inp, out) }
-                logger.lifecycle("Applied access wideners in $time")
+                logger.info("Applied access wideners in $time")
             } else {
                 copy(inp, out)
+                logger.info("Applied no access wideners")
             }
         } finally {
             inp.close()

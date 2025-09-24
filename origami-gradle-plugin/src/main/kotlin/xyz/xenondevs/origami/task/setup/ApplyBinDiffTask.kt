@@ -44,7 +44,7 @@ abstract class ApplyBinDiffTask @Inject constructor() : DefaultTask() {
     fun apply() {
         val mcVersion = minecraftVersion.get()
         val tempPaperclip = temporaryDir.resolve("paperclip-$mcVersion.jar")
-        logger.lifecycle("Running Paperclip bin diff for $mcVersion")
+        logger.info("Running Paperclip bin diff for $mcVersion")
         
         FileSystems.newFileSystem(devBundleZip.get().asFile.toPath()).use { fs ->
             val root = fs.getPath("/")

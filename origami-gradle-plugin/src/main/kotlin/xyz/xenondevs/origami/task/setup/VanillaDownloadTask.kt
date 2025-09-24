@@ -49,7 +49,7 @@ abstract class VanillaDownloadTask @Inject constructor(private val layout: Proje
         val dl = downloader.get()
         val mcVersion = minecraftVersion.get()
         
-        logger.lifecycle("Downloading vanilla server files for Minecraft version $mcVersion")
+        logger.info("Downloading vanilla server files for Minecraft version $mcVersion")
         
         val manifest = dl.getJsonObject(VERSION_MANIFEST)
         val versions = manifest.getAsJsonArray("versions")

@@ -57,7 +57,7 @@ abstract class ApplyPaperPatchesTask @Inject constructor() : DefaultTask() {
     
     @TaskAction
     fun run() {
-        logger.lifecycle("Applying Paper patches for ${minecraftVersion.get()} server")
+        logger.info("Applying Paper patches for ${minecraftVersion.get()} server")
         val patches = temporaryDir.resolve("patches").apply { deleteRecursively(); mkdirs() }
         val newSources = this.newSources.get().asFile.apply { deleteRecursively(); mkdirs() }
         val patchedSources = this.patchedSources.get().asFile.apply { deleteRecursively(); mkdirs() }

@@ -61,7 +61,7 @@ abstract class RemapTask @Inject constructor() : DefaultTask() {
     @TaskAction
     fun run() {
         val mcVersion = minecraftVersion.get()
-        logger.lifecycle("Remapping obfuscated vanilla server $mcVersion jar")
+        logger.info("Remapping obfuscated vanilla server $mcVersion jar")
         val tempOut = temporaryDir.resolve("vanilla-remapped-$mcVersion.jar")
         
         val libraries = vanillaLibraries.get().asFile.walkTopDown()
