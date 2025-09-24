@@ -1,7 +1,6 @@
 package xyz.xenondevs.origami;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.instrument.Instrumentation;
@@ -10,63 +9,59 @@ import java.lang.invoke.MethodType;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
 
 public class OrigamiAgent {
     
+    private static final Path LIBRARIES_DIR = Path.of("libraries/");
+    
     private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
-    
     private static ClassLoader origamiLoader;
-    
     private static Object origami;
-    
-    static {
-        System.setProperty("origami.agent.url", OrigamiAgent.class.getProtectionDomain().getCodeSource().getLocation().toExternalForm());
-    }
     
     public static void premain(String agentArgs, Instrumentation instrumentation) throws Throwable {
         // In case a server admin specifies multiple plugins with Origami as agents
-        if (Boolean.getBoolean("origami.agent.loaded")) {
+        if (Boolean.getBoolean("origami.agent.loaded"))
             return;
-        }
         System.setProperty("origami.agent.loaded", "true");
         
-        var classpath = buildClasspath();
-        origamiLoader = new URLClassLoader(classpath.toArray(new URL[0]), OrigamiAgent.class.getClassLoader().getParent());
+        origamiLoader = new URLClassLoader(buildClasspath(), OrigamiAgent.class.getClassLoader().getParent());
         var origamiClass = Class.forName("xyz.xenondevs.origami.Origami", true, origamiLoader);
         origami = origamiClass.getConstructor(Instrumentation.class, ClassLoader.class)
             .newInstance(instrumentation, OrigamiAgent.class.getClassLoader());
     }
     
-    public static ArrayList<URL> buildClasspath() {
-        var urls = new ArrayList<URL>();
+    public static URL[] buildClasspath() {
         try {
-            Set<String> libraries;
-            try (var reader = new BufferedReader(new InputStreamReader(OrigamiAgent.class.getResourceAsStream("/origami-libraries")))) {
-                libraries = reader.lines().collect(Collectors.toSet());
+            List<String> lines;
+            try (var libsStream = OrigamiAgent.class.getResourceAsStream("/origami-libraries")) {
+                Objects.requireNonNull(libsStream);
+                var reader = new BufferedReader(new InputStreamReader(libsStream));
+                lines = reader.lines().toList();
             }
             
-            for (var entry : libraries) {
-                if (entry.isEmpty()) continue;
-                // /lib/a/b/c/b-c.jar -> a/b/c/b-c.jar
-                var libName = entry.split("/", 3)[2];
-                var libFile = new File("libraries/" + libName);
-                urls.add(libFile.toURI().toURL());
-                if (libFile.exists()) continue;
-                libFile.getParentFile().mkdirs();
-                
-                try (var libStream = OrigamiAgent.class.getResourceAsStream(entry)) {
-                    Files.copy(libStream, libFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            String inZipLibsDir = lines.getFirst();
+            URL[] urls = new URL[lines.size() - 1];
+            
+            for (int i = 1; i < lines.size(); i++) {
+                var src = lines.get(i);
+                var dst = LIBRARIES_DIR.resolve(src.substring(inZipLibsDir.length()));
+                if (!Files.exists(dst)) {
+                    Files.createDirectories(dst.getParent());
+                    try (var srcStream = OrigamiAgent.class.getResourceAsStream(src)) {
+                        Objects.requireNonNull(srcStream);
+                        Files.copy(srcStream, dst);
+                    }
                 }
+                urls[i - 1] = dst.toUri().toURL();
             }
+            
+            return urls;
         } catch (IOException e) {
             throw new RuntimeException("Failed to extract Origami libraries", e);
         }
-        
-        return urls;
     }
     
     @SuppressWarnings("unused") // call is injected by Origami

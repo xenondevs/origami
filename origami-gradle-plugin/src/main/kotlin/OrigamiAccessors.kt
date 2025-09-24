@@ -1,11 +1,8 @@
 import org.gradle.jvm.tasks.Jar
-import org.gradle.kotlin.dsl.getByType
-import xyz.xenondevs.origami.extension.OrigamiJarExtension
-
-fun Jar.addOrigamiLoader(librariesFolder: String = "libs") {
-    extensions.getByType<OrigamiJarExtension>().addOrigamiLoader(librariesFolder)
-}
+import org.gradle.kotlin.dsl.getByName
+import xyz.xenondevs.origami.task.packaging.PrepareOrigamiMarkerTask
 
 fun Jar.addOrigamiJson() {
-    extensions.getByType<OrigamiJarExtension>().addOrigamiJson()
+    val prepMarker = project.tasks.getByName<PrepareOrigamiMarkerTask>("_oriPrepareMarker")
+    from(prepMarker.jsonOutput)
 }
