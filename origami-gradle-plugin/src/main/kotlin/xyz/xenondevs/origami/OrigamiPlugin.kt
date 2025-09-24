@@ -45,7 +45,7 @@ abstract class OrigamiPlugin : Plugin<Project> {
     }
     
     companion object {
-        val version = this::class.java.classLoader.getResourceAsStream("version")?.bufferedReader()?.use { it.readText() }
+        val version = this::class.java.classLoader.getResourceAsStream("xyz.xenondevs.origami.version")?.bufferedReader()?.use { it.readText() }
             ?: throw IllegalStateException("Could not read origami plugin version from resources")
     }
     

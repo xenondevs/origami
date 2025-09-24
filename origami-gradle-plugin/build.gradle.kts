@@ -54,7 +54,7 @@ publishing {
 }
 
 tasks.register("generateVersionFile") {
-    val versionFile = layout.buildDirectory.file("generatedResources/version").get().asFile
+    val versionFile = layout.buildDirectory.file("generatedResources/xyz.xenondevs.origami.version").get().asFile
     inputs.property("projectVersion", project.version.toString())
     outputs.file(versionFile)
     
