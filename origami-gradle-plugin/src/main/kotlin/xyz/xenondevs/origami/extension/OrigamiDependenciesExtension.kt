@@ -16,7 +16,7 @@ abstract class OrigamiDependenciesExtension(
     fun patchedPaperServer(): Provider<ExternalModuleDependency> {
         val installTask = project.tasks.named<InstallTask>("_oriInstallJar")
         
-        val repo = project.repositories.maven(plugin.localRepo.folder.get().asFile.toPath()) {
+        val repo = project.repositories.maven(plugin.localRepo) {
             content { includeGroup("xyz.xenondevs.origami.patched-server") }
         }
         project.repositories.remove(repo)

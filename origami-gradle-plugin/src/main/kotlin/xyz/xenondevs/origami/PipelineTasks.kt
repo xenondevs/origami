@@ -89,6 +89,7 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
         (this as Task).configureCommon()
         
         localRepo.set(plugin.localRepo)
+        group.set("xyz.xenondevs.origami.patched-server")
         name.set("widened-server-${project.name}")
         version.set(ext.devBundleVersion)
     }
@@ -148,10 +149,10 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
         output.set(workDir.map { it.file("paper-server-widened.jar") })
     }
     
-    val installJar = tasks.register<InstallTask.Jar>("_oriInstallJar") {
+    val installJar = tasks.register<InstallTask.Artifact>("_oriInstallJar") {
         configureCommon()
         dependsOn(installPom)
-        jar.set(widenJar.flatMap(WidenTask::output))
+        source.set(widenJar.flatMap(WidenTask::output))
     }
     //</editor-fold>
     
@@ -221,10 +222,11 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
         output.set(workDir.map { it.file("paper-server-widened-sources.jar") })
     }
     
-    val installSourcesJar = tasks.register<InstallTask.SourcesJar>("_oriInstallSourcesJar") {
+    val installSourcesJar = tasks.register<InstallTask.Artifact>("_oriInstallSourcesJar") {
         configureCommon()
         dependsOn(installPom)
-        sourcesJar.set(widenSources.flatMap(WidenTask::output))
+        classifier.set("sources")
+        source.set(widenSources.flatMap(WidenTask::output))
     }
     //</editor-fold>
     
