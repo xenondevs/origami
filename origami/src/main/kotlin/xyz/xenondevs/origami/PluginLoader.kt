@@ -114,7 +114,7 @@ object PluginLoader {
         val pluginId = origamiJson.getAsJsonPrimitive("pluginId")?.asString ?: pluginName
         // TODO: check origami version mismatch and tell user to run the plugin with a newer version of Origami as the agent
         
-        val accessWidenerEntry = jar.getJarEntry("$pluginId.accesswidener")
+        val accessWidenerEntry = jar.getJarEntry("$pluginId.accesswidener") ?: jar.getEntry("$pluginId.aw")
         if (accessWidenerEntry != null) {
             synchronized(AccessTransformer) {
                 AccessTransformer.readAccessWidener(jar.getInputStream(accessWidenerEntry))

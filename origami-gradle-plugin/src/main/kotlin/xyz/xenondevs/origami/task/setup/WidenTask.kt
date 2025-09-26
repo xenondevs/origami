@@ -115,7 +115,7 @@ abstract class WidenTask : DefaultTask() {
             .forEach { jarFile ->
                 ZipInputStream(jarFile.inputStream().buffered()).use { zin ->
                     generateSequence { zin.nextEntry }
-                        .filter { entry -> entry.name.endsWith(".accesswidener", true) }
+                        .filter { entry -> entry.name.endsWith(".accesswidener") || entry.name.endsWith(".aw") }
                         .forEach { entry ->
                             logger.info("Using transitive access wideners from ${jarFile.name} (${entry.name})")
                             val awr = AccessWidenerReader(TransitiveOnlyFilter(ForwardingVisitor(config, accessWidener)))
