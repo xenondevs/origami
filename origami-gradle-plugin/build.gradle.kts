@@ -1,19 +1,13 @@
 plugins {
-    alias(libs.plugins.kotlin)
     `kotlin-dsl`
     `maven-publish`
 }
 
 repositories {
     mavenCentral()
-    mavenLocal()
-    gradlePluginPortal()
 }
 
 dependencies {
-    implementation(gradleApi())
-    implementation(gradleKotlinDsl())
-    implementation(libs.kotlin.stdlib)
     implementation(libs.gson)
     implementation(libs.accesswidener)
     implementation(libs.diffpatch)

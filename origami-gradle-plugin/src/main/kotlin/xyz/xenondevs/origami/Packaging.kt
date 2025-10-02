@@ -42,7 +42,7 @@ fun Project.registerPackagingTasks() {
         archiveExtension.set(jar.flatMap { it.archiveExtension })
         archiveClassifier.set("origami")
 
-        from(ext.input.convention(jar.map { it.source })) {
+        from(ext.input) {
             exclude("MANIFEST.MF") // for some reason there is a MANIFEST.MF in the root dir
         }
         from(prepareMarker.flatMap { it.jsonOutput })

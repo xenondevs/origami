@@ -36,7 +36,7 @@ abstract class OrigamiPlugin : Plugin<Project> {
         
         target.plugins.apply("java")
         target.registerConfigurations()
-        target.registerExtensions(this)
+        target.registerExtensions()
         val ext = target.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)
         localRepo = ext.cache.dir("local-repo")
         

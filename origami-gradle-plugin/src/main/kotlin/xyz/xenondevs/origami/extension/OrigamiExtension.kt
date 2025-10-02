@@ -1,18 +1,23 @@
 package xyz.xenondevs.origami.extension
 
+import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.ProjectLayout
-import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.SetProperty
+import org.gradle.api.tasks.bundling.Jar
+import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.property
 import org.gradle.kotlin.dsl.setProperty
+import xyz.xenondevs.origami.util.providerSet
 import javax.inject.Inject
 
 abstract class OrigamiExtension @Inject constructor(
+    project: Project,
     objects: ObjectFactory,
     layout: ProjectLayout
 ) {
@@ -32,25 +37,35 @@ abstract class OrigamiExtension @Inject constructor(
     
     /**
      * A collection of files from which transitive access wideners should be read and applied.
-     * 
+     *
      * Defaults to none.
      */
     val transitiveAccessWidenerSources: ConfigurableFileCollection = objects.fileCollection()
     
     /**
-     * The input fils sto be used for the `origamiJar` task.
-     * 
+     * The input files to be used for the `origamiJar` task.
+     *
      * Defaults the input of the `jar` task.
      */
     val input: ConfigurableFileCollection = objects.fileCollection()
+        .convention(project.tasks.named<Jar>("jar").map { it.source })
     
     /**
      * The name of the directory inside the jar containing origami's bundled libraries.
-     * 
+     *
      * Defaults to `libs`.
      */
     val librariesDirectory: Property<String> = objects.property<String>()
         .convention("libs")
+    
+    /**
+     * The configurations to which the server dependency should be added.
+     */
+    val targetConfigurations: SetProperty<Configuration> = objects.setProperty<Configuration>()
+        .convention(objects.providerSet(
+            project.configurations.named(JavaPlugin.COMPILE_ONLY_CONFIGURATION_NAME),
+            project.configurations.named(JavaPlugin.TEST_IMPLEMENTATION_CONFIGURATION_NAME)
+        ))
     
     /**
      * Configures [devBundleGroup], [devBundleArtifact], [devBundleVersion] based

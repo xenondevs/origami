@@ -9,9 +9,7 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
@@ -36,8 +34,21 @@ abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
     @get:Internal
     val localRepo: DirectoryProperty = objects.directoryProperty()
     
+    // dummy output file used to create dependency of configuration artifact resolution onto install task
+    @get:OutputFile
+    val dummyFile: RegularFileProperty = objects.fileProperty()
+        .convention(localRepo.file("~origami"))
+    
     @get:OutputFile
     abstract val target: RegularFileProperty
+    
+    @TaskAction
+    fun run() {
+        dummyFile.get().asFile.createNewFile()
+        install()
+    }
+    
+    abstract fun install()
     
     abstract class Artifact @Inject constructor(objects: ObjectFactory) : InstallTask(objects) {
         
@@ -67,8 +78,7 @@ abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
                     }
             )
         
-        @TaskAction
-        fun run() {
+        override fun install() {
             target.get().asFile.parentFile.mkdirs()
             source.get().asFile.copyTo(target.get().asFile, true)
         }
@@ -92,8 +102,7 @@ abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
                     }
             )
         
-        @TaskAction
-        fun run() {
+        override fun install() {
             val root = paperClasspathConfig.get()
                 .incoming
                 .resolutionResult

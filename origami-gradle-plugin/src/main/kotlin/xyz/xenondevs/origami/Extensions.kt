@@ -1,13 +1,10 @@
 package xyz.xenondevs.origami
 
 import org.gradle.api.Project
-import org.gradle.api.tasks.Delete
 import org.gradle.kotlin.dsl.create
-import org.gradle.kotlin.dsl.getByName
-import xyz.xenondevs.origami.extension.OrigamiDependenciesExtension
 import xyz.xenondevs.origami.extension.OrigamiExtension
 
-internal fun Project.registerExtensions(plugin: OrigamiPlugin) {
+internal fun Project.registerExtensions() {
     val oriExt = extensions.create<OrigamiExtension>(ORIGAMI_EXTENSION)
     oriExt.pluginId.convention(name)
     
@@ -16,5 +13,4 @@ internal fun Project.registerExtensions(plugin: OrigamiPlugin) {
     }
     dependencies.addProvider(DEV_BUNDLE_CONFIG, devBundleNotation)
     dependencies.addProvider(DEV_BUNDLE_COMPILE_CLASSPATH, devBundleNotation)
-    dependencies.extensions.create<OrigamiDependenciesExtension>(ORIGAMI_EXTENSION, this, plugin)
 }

@@ -18,9 +18,12 @@ import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.task.setup.ApplyPaperPatchesTask
 import xyz.xenondevs.origami.task.setup.DecompileTask
 import xyz.xenondevs.origami.task.setup.InstallTask
-import xyz.xenondevs.origami.task.setup.WidenTask
 import xyz.xenondevs.origami.task.setup.RemapTask
 import xyz.xenondevs.origami.task.setup.VanillaDownloadTask
+import xyz.xenondevs.origami.task.setup.WidenTask
+import xyz.xenondevs.origami.util.getIdeaSourcesDownloadTasks
+import xyz.xenondevs.origami.util.isIdeaSync
+import xyz.xenondevs.origami.util.prependTaskRequest
 import xyz.xenondevs.origami.value.DevBundle
 import xyz.xenondevs.origami.value.DevBundleValueSource
 import xyz.xenondevs.origami.value.MacheConfigValueSource
@@ -236,25 +239,37 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
     }
     
     afterEvaluate {
-        if (!hasDevBundle.get()) return@afterEvaluate
+        if (!hasDevBundle.get()) 
+            return@afterEvaluate
         
-        gradle.projectsEvaluated {
-            val importTask = tasks.findByName("prepareKotlinBuildScriptModel")
-                ?: tasks.findByName("ideaModule")
-                ?: tasks.findByName("eclipseClasspath")
-            
-            importTask?.dependsOn(installJar)
-            
-            tasks.findByName("compileJava")?.dependsOn(installJar)
-            tasks.findByName("compileTestJava")?.dependsOn(installJar)
-            tasks.findByName("compileKotlin")?.dependsOn(installJar)
-            tasks.findByName("compileTestKotlin")?.dependsOn(installJar)
+        // idea sync installs jar
+        if (isIdeaSync()) {
+            // TODO: if sources exist, either delete them or regenerate them as well (prevent access widener desync between sources and binaries)
+            prependTaskRequest(gradle.startParameter, installJar)
         }
         
-        val cfg = macheConfig.get()
+        // download sources button triggers source generation
+        for (task in getIdeaSourcesDownloadTasks(this, installSourcesJar.get())) {
+            task.dependsOn(installSourcesJar)
+        }
+        
+        for (targetCfg in ext.targetConfigurations.get()) {
+            targetCfg.withDependencies { 
+                add(dependencyFactory.create(files(installJar.flatMap { it.dummyFile })))
+                addLater(installJar.flatMap {
+                    it.name.zip(it.version) { artifact, version ->
+                        dependencyFactory.create("xyz.xenondevs.origami.patched-server:$artifact:$version")
+                    }
+                })
+            }
+        }
         
         repositories {
-            cfg.repositories.forEach { repo ->
+            maven(plugin.localRepo) {
+                content { includeGroup("xyz.xenondevs.origami.patched-server") }
+            }
+            
+            macheConfig.get().repositories.forEach { repo ->
                 maven(repo.url) {
                     name = repo.name
                     content {
