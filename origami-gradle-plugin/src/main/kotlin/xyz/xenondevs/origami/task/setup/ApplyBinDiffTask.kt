@@ -65,8 +65,23 @@ abstract class ApplyBinDiffTask @Inject constructor() : DefaultTask() {
             tempPaperclip.absolutePath
         ).directory(tempPaperclip.parentFile).redirectOutput(paperclipLog).start()
         check(process.waitFor() == 0) { "Failed to apply bin diff, Paperclip exited with code ${process.exitValue()}" }
-        
-        val patched = temporaryDir.resolve("versions/$mcVersion/paper-$mcVersion.jar")
+
+        val jarPath = FileSystems.newFileSystem(tempPaperclip.toPath()).use { fs ->
+            val versionsListPath = fs.getPath("/META-INF/versions.list")
+            if (Files.exists(versionsListPath)) {
+                val lines = Files.readAllLines(versionsListPath)
+                lines.find { line ->
+                    val parts = line.split("\t")
+                    parts.size >= 3 && parts[1] == mcVersion
+                }?.split("\t")?.get(2) ?: ""
+            } else {
+                ""
+            }
+        }
+
+        check(jarPath.isNotEmpty()) { "Failed to find jar for $mcVersion in Paperclip jar" }
+
+        val patched = temporaryDir.resolve("versions/$jarPath")
         check(patched.exists()) { "Patched jar not found at ${patched.absolutePath}" }
         
         Files.copy(patched.toPath(), patchedJar.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
