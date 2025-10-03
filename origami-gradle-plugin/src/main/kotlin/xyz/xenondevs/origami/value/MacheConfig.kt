@@ -29,12 +29,12 @@ data class MacheDependencies(
 abstract class MacheConfigValueSource: ValueSource<MacheConfig, MacheConfigValueSource.Parameters> {
     
     interface Parameters : ValueSourceParameters {
-        @InputFile
-        fun getZip(): RegularFileProperty
+        @get:InputFile
+        val zip: RegularFileProperty
     }
     
     override fun obtain(): MacheConfig? {
-        val macheZip = parameters.getZip().asFile.get()
+        val macheZip = parameters.zip.asFile.get()
         FileSystems.newFileSystem(macheZip.toPath()).use { fs ->
             fs.getPath("mache.json").reader().use {
                 return GSON.fromJson(it, MacheConfig::class.java)
