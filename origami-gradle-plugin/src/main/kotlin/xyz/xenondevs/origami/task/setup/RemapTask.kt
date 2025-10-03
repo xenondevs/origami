@@ -86,8 +86,9 @@ abstract class RemapTask @Inject constructor() : DefaultTask() {
             "-Xmx2G",
             "-jar",
             codebook.get().asFile.absolutePath,
+            "--force", // overwrite existing output file
             *args.toTypedArray()
-        ).directory(temporaryDir).redirectOutput(codebookLog).start()
+        ).directory(temporaryDir).redirectError(codebookLog).redirectOutput(codebookLog).start()
         
         check(process.waitFor() == 0) { "Failed to remap, Codebook exited with code ${process.exitValue()}" }
         check(tempOut.exists()) { "Failed to remap, remapped jar not found at ${tempOut.absolutePath}" }
