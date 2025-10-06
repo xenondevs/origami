@@ -10,27 +10,26 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import xyz.xenondevs.origami.util.withLock
 import java.io.File
 import java.io.PrintStream
 import java.nio.file.FileSystems
 import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.jar.JarOutputStream
 import java.util.zip.ZipEntry
-import javax.inject.Inject
 import kotlin.io.path.extension
 import kotlin.io.path.relativeTo
 
-@CacheableTask
-abstract class ApplyPaperPatchesTask @Inject constructor() : DefaultTask() {
+internal abstract class ApplyPaperPatchesTask : DefaultTask() {
+    
+    @get:Internal
+    abstract val lockFile: RegularFileProperty
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
@@ -46,17 +45,26 @@ abstract class ApplyPaperPatchesTask @Inject constructor() : DefaultTask() {
     @get:Input
     abstract val patchesRootName: Property<String>
     
-    @get:OutputFile
+    @get:Internal
     abstract val patchedJar: RegularFileProperty
     
-    @get:OutputDirectory
+    @get:Internal
     abstract val newSources: DirectoryProperty
     
-    @get:OutputDirectory
+    @get:Internal
     abstract val patchedSources: DirectoryProperty
     
+    init {
+        outputs.upToDateWhen { (it as ApplyPaperPatchesTask).patchedJar.get().asFile.exists() }
+    }
+    
     @TaskAction
-    fun run() {
+    fun run(): Unit = withLock(lockFile) {
+        if (patchedJar.get().asFile.exists()) {
+            logger.info("ApplyPaperPatches already completed, skipping")
+            return
+        }
+        
         logger.info("Applying Paper patches for ${minecraftVersion.get()} server")
         val patches = temporaryDir.resolve("patches").apply { deleteRecursively(); mkdirs() }
         val newSources = this.newSources.get().asFile.apply { deleteRecursively(); mkdirs() }
@@ -107,6 +115,6 @@ abstract class ApplyPaperPatchesTask @Inject constructor() : DefaultTask() {
             }
         }
         
-        Files.move(tempSources.toPath(), patchedJar.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        tempSources.copyTo(patchedJar.get().asFile.apply { parentFile.mkdirs() }, true)
     }
 }

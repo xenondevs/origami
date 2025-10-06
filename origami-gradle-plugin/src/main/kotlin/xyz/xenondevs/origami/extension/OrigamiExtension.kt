@@ -5,6 +5,7 @@ import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.ProjectLayout
+import org.gradle.api.invocation.Gradle
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.provider.Property
@@ -17,6 +18,7 @@ import xyz.xenondevs.origami.util.providerSet
 import javax.inject.Inject
 
 abstract class OrigamiExtension @Inject constructor(
+    gradle: Gradle,
     project: Project,
     objects: ObjectFactory,
     layout: ProjectLayout
@@ -24,6 +26,9 @@ abstract class OrigamiExtension @Inject constructor(
     
     val cache: DirectoryProperty = objects.directoryProperty()
         .convention(layout.projectDirectory.dir(".gradle/caches/origami"))
+    
+    val sharedCache: DirectoryProperty = objects.directoryProperty()
+        .convention(layout.dir(project.provider { gradle.gradleUserHomeDir.resolve("caches/origami/0/") })) // increment number when cache structure changes
     
     // TODO: make this optional and default to whatever is defined by the paper-plugin.yml in the marker task instead of
     //       the project name.

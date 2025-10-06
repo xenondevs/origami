@@ -10,24 +10,24 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.jvm.toolchain.JavaLauncher
+import xyz.xenondevs.origami.util.withLock
 import java.io.PrintStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import javax.inject.Inject
 import kotlin.time.Duration.Companion.milliseconds
 
-@CacheableTask
-abstract class DecompileTask @Inject constructor() : DefaultTask() {
+internal abstract class DecompileTask : DefaultTask() {
+    
+    @get:Internal
+    abstract val lockFile: RegularFileProperty
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
@@ -54,11 +54,20 @@ abstract class DecompileTask @Inject constructor() : DefaultTask() {
     @get:Input
     abstract val minecraftVersion: Property<String>
     
-    @get:OutputFile
+    @get:Internal
     abstract val decompiledSources: RegularFileProperty
     
+    init {
+        outputs.upToDateWhen { (it as DecompileTask).decompiledSources.get().asFile.exists() }
+    }
+    
     @TaskAction
-    fun run() {
+    fun run(): Unit = withLock(lockFile) {
+        if (decompiledSources.get().asFile.exists()) {
+            logger.info("Decompile already completed, skipping")
+            return
+        }
+        
         val mcVer = minecraftVersion.get()
         val tempOut = temporaryDir.resolve("decompiled-$mcVer.jar")
         val config = temporaryDir.resolve("$mcVer.cfg")
@@ -109,6 +118,7 @@ abstract class DecompileTask @Inject constructor() : DefaultTask() {
         check(diffRes.exit == 0) { "Failed to apply mache patches, diffpatch exited with code ${diffRes.exit}" }
         check(fixedOut.exists()) { "Failed to apply mache patches, fixed jar not found at ${fixedOut.absolutePath}" }
         
+        decompiledSources.get().asFile.parentFile.mkdirs()
         Files.move(fixedOut.toPath(), decompiledSources.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
         logger.info("Decompiled server in ${(System.currentTimeMillis() - start).milliseconds}")
     }

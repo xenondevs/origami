@@ -1,108 +1,102 @@
 package xyz.xenondevs.origami.task.setup
 
-import com.google.gson.JsonObject
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.ProjectLayout
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.OutputDirectory
-import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
-import xyz.xenondevs.origami.service.DownloaderService
 import xyz.xenondevs.origami.util.AsyncUtils
 import xyz.xenondevs.origami.util.GSON
+import xyz.xenondevs.origami.util.dto.VersionData
+import xyz.xenondevs.origami.util.dto.VersionManifest
+import xyz.xenondevs.origami.util.withLock
 import java.io.File
-import java.util.concurrent.CompletableFuture
+import java.net.URI
 import java.util.concurrent.TimeUnit
-import java.util.zip.ZipFile
+import java.util.zip.ZipInputStream
 import javax.inject.Inject
 
 private const val VERSION_MANIFEST = "https://launchermeta.mojang.com/mc/game/version_manifest.json"
 
-@CacheableTask
-abstract class VanillaDownloadTask @Inject constructor(private val layout: ProjectLayout) : DefaultTask() {
+internal abstract class VanillaDownloadTask @Inject constructor(objects: ObjectFactory) : DefaultTask() {
+    
+    @get:Internal
+    abstract val lockFile: RegularFileProperty
     
     @get:Input
     abstract val minecraftVersion: Property<String>
     
     @get:Internal
-    abstract val downloader: Property<DownloaderService>
+    val workDir: DirectoryProperty = objects.directoryProperty()
     
-    @get:OutputFile
-    abstract val bundleJar: RegularFileProperty
+    @get:Internal
+    val serverMappings = workDir.map { it.file("server-mappings.txt") }
     
-    @get:OutputFile
-    abstract val serverMappings: RegularFileProperty
+    @get:Internal
+    val serverJar = workDir.map { it.file("server.jar") }
     
-    @get:OutputFile
-    abstract val serverJar: RegularFileProperty
+    @get:Internal
+    val librariesDir = workDir.map { it.dir("libraries") }
     
-    @get:OutputDirectory
-    abstract val librariesDir: DirectoryProperty
+    init {
+        outputs.upToDateWhen { (it as VanillaDownloadTask).serverJar.get().asFile.exists() }
+    }
     
     @TaskAction
-    fun download() {
-        val dl = downloader.get()
-        val mcVersion = minecraftVersion.get()
+    fun run() = withLock(lockFile) {
+        if (serverJar.get().asFile.exists()) {
+            logger.info("VanillaDownload already completed, skipping")
+            return
+        }
         
-        logger.info("Downloading vanilla server files for Minecraft version $mcVersion")
+        logger.info("Downloading vanilla server files for Minecraft version ${minecraftVersion.get()}")
         
-        val manifest = dl.getJsonObject(VERSION_MANIFEST)
-        val versions = manifest.getAsJsonArray("versions")
-        val versionJson = versions.first { it.asJsonObject.getAsJsonPrimitive("id").asString == mcVersion }.asJsonObject
-        
-        val versionManifest = dl.getJsonObject(versionJson.getAsJsonPrimitive("url").asString)
-        val downloads = versionManifest.getAsJsonObject("downloads")
-        
-        val serverUrl = downloads.getAsJsonObject("server").getAsJsonPrimitive("url").asString
-        val mappingsUrl = downloads.getAsJsonObject("server_mappings").getAsJsonPrimitive("url").asString
+        val serverUrl: String
+        val mappingsUrl: String
+        run {
+            val mcVersion = minecraftVersion.get()    
+            val versionUrl = downloadJson<VersionManifest>(VERSION_MANIFEST).versions.first { it.id == mcVersion }.url
+            val downloads = downloadJson<VersionData>(versionUrl).downloads
+            serverUrl = downloads["server"]!!.url
+            mappingsUrl = downloads["server_mappings"]!!.url
+        }
         
         val pool = AsyncUtils.createPool("vanilla-downloads", threadCount = 4)
-        val bundleFuture = CompletableFuture<Unit>()
-        
-        pool.execute {
-            dl.download(serverUrl, bundleJar.get().asFile)
-            bundleFuture.complete(Unit)
-        }
-        pool.execute {
-            dl.download(mappingsUrl, serverMappings.get().asFile)
-        }
-        pool.execute {
-            bundleFuture.join()
-            extractServerAndLibraries()
-        }
-        
+        pool.execute { downloadServerAndLibraries(serverUrl) }
+        pool.execute { download(mappingsUrl, serverMappings.get().asFile) }
         pool.shutdown()
         pool.awaitTermination(10, TimeUnit.MINUTES)
     }
     
-    private fun extractServerAndLibraries() {
-        val zip = ZipFile(bundleJar.get().asFile)
-        try {
-            val mcVer = zip.getInputStream(zip.getEntry("version.json"))
-                .reader().use { GSON.fromJson(it, JsonObject::class.java) }
-                .get("id").asString
-            
-            val serverEntry = zip.getEntry("META-INF/versions/$mcVer/server-$mcVer.jar")
-            zip.getInputStream(serverEntry).use { zis -> serverJar.get().asFile.outputStream().use(zis::copyTo) }
-            
-            val librariesDir = librariesDir.get().asFile.apply { deleteRecursively(); mkdirs() }
-            val libraries = ArrayList<File>()
-            zip.stream()
-                .filter { !it.isDirectory && it.name.startsWith("META-INF/libraries/") && it.name.endsWith(".jar") }
+    private fun downloadServerAndLibraries(serverJarUrl: String) {
+        ZipInputStream(URI(serverJarUrl).toURL().openConnection().getInputStream().buffered()).use { inp ->
+            generateSequence { inp.nextEntry }
+                .filterNot { it.isDirectory }
+                .filter { it.name.startsWith("META-INF/") }
                 .forEach { entry ->
-                    val libraryFile = librariesDir.resolve(entry.name.removePrefix("META-INF/libraries/"))
-                    libraryFile.parentFile.mkdirs()
-                    libraries.add(libraryFile)
-                    zip.getInputStream(entry).use { zis -> libraryFile.outputStream().use(zis::copyTo) }
+                    if (entry.name == "META-INF/versions/${minecraftVersion.get()}/server-${minecraftVersion.get()}.jar") {
+                        serverJar.get().asFile.parentFile.mkdirs()
+                        serverJar.get().asFile.outputStream().use { out -> inp.copyTo(out) }
+                    } else if (entry.name.startsWith("META-INF/libraries/")) {
+                        val libFile = librariesDir.get().asFile.resolve(entry.name.removePrefix("META-INF/libraries/"))
+                        libFile.parentFile.mkdirs()
+                        libFile.outputStream().use { out -> inp.copyTo(out) }
+                    }
                 }
-        } finally {
-            zip.close()
         }
     }
+    
+    private fun download(url: String, dest: File) {
+        dest.parentFile.mkdirs()
+        URI(url).toURL().openStream().use { input ->
+            dest.outputStream().use { output -> input.copyTo(output) }
+        }
+    }
+    
+    private inline fun <reified T> downloadJson(url: String): T =
+        URI(url).toURL().openStream().bufferedReader().use { GSON.fromJson<T>(it, T::class.java)!! }
     
 }

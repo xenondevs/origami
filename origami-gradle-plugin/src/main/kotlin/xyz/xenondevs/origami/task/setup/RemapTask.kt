@@ -5,23 +5,23 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.jvm.toolchain.JavaLauncher
+import xyz.xenondevs.origami.util.withLock
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import javax.inject.Inject
 
-@CacheableTask
-abstract class RemapTask @Inject constructor() : DefaultTask() {
-
+internal abstract class RemapTask : DefaultTask() {
+    
+    @get:Internal
+    abstract val lockFile: RegularFileProperty
+    
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val vanillaServer: RegularFileProperty
@@ -55,11 +55,20 @@ abstract class RemapTask @Inject constructor() : DefaultTask() {
     @get:Input
     abstract val minecraftVersion: Property<String>
     
-    @get:OutputFile
+    @get:Internal
     abstract val remappedJar: RegularFileProperty
     
+    init {
+        outputs.upToDateWhen { (it as RemapTask).remappedJar.get().asFile.exists() }
+    }
+    
     @TaskAction
-    fun run() {
+    fun run(): Unit = withLock(lockFile) {
+        if (remappedJar.get().asFile.exists()) {
+            logger.info("Remap already completed, skipping")
+            return
+        }
+        
         val mcVersion = minecraftVersion.get()
         logger.info("Remapping obfuscated vanilla server $mcVersion jar")
         val tempOut = temporaryDir.resolve("vanilla-remapped-$mcVersion.jar")
@@ -93,6 +102,7 @@ abstract class RemapTask @Inject constructor() : DefaultTask() {
         check(process.waitFor() == 0) { "Failed to remap, Codebook exited with code ${process.exitValue()}" }
         check(tempOut.exists()) { "Failed to remap, remapped jar not found at ${tempOut.absolutePath}" }
         
+        remappedJar.get().asFile.parentFile.mkdirs()
         Files.move(tempOut.toPath(), remappedJar.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
     

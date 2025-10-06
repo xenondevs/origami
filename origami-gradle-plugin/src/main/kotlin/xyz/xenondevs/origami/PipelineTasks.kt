@@ -2,7 +2,9 @@ package xyz.xenondevs.origami
 
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.dsl.DependencyHandler
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
 import org.gradle.api.plugins.JavaPluginExtension
@@ -17,7 +19,6 @@ import org.gradle.kotlin.dsl.of
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.repositories
 import xyz.xenondevs.origami.extension.OrigamiExtension
-import xyz.xenondevs.origami.service.DownloaderService
 import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.task.setup.ApplyPaperPatchesTask
 import xyz.xenondevs.origami.task.setup.DecompileTask
@@ -35,7 +36,7 @@ import xyz.xenondevs.origami.value.MacheConfig
 import xyz.xenondevs.origami.value.MacheConfigValueSource
 import java.io.File
 
-fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin) {
+fun Project.registerTasks(plugin: OrigamiPlugin) {
     fun Provider<File>.toRegular() = layout.file(this)
     
     val ext: OrigamiExtension = this.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)
@@ -45,7 +46,8 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
     val devBundleHash: Provider<String> = providers.of(DevBundleHashSource::class) { parameters.zip.set(bundleZip) }
     val macheConfig: Provider<MacheConfig> = providers.of(MacheConfigValueSource::class) { parameters.zip.set(macheZip) }
     val mcVersion: Provider<String> = devBundleInfo.map(DevBundle::minecraftVersion)
-    val workDir: Provider<Directory> = ext.cache.zip(devBundleHash) { cache, hash -> cache.dir(hash) }
+    val sharedWorkDir: Provider<Directory> = ext.sharedCache.zip(devBundleHash) { cache, hash -> cache.dir(hash) }
+    val lockFile: Provider<RegularFile> = sharedWorkDir.map { it.file(".lock") }
     val launcher: Provider<JavaLauncher> = extensions.findByType<JavaPluginExtension>()
         ?.toolchain
         ?.let(plugin.javaToolchainService::launcherFor)
@@ -59,6 +61,7 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
     val clean = tasks.register<Delete>("_oriClean") {
         group = ORIGAMI_TASK_GROUP
         delete(ext.cache)
+        delete(ext.sharedCache)
     }
     
     fun Task.configureCommon() {
@@ -103,19 +106,17 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
     val vanillaDownloads = tasks.register<VanillaDownloadTask>("_oriVanillaDownload") {
         configureCommon()
         
+        this.lockFile.set(lockFile)
         minecraftVersion.set(mcVersion)
-        downloader.set(dl)
-        
-        val workDir = workDir.map { it.dir("vanilla") }
-        bundleJar.set(workDir.map { it.file("bundle.jar") })
-        serverMappings.set(workDir.map { it.file("server-mappings.txt") })
-        serverJar.set(workDir.map { it.file("server.jar") })
-        librariesDir.set(workDir.map { it.dir("libraries") })
+        workDir.set(sharedWorkDir.map { it.dir("vanilla") })
     }
     
     //<editor-fold desc="binaries pipeline">
     val applyBinDiff = tasks.register<ApplyBinDiffTask>("_oriApplyBinDiff") {
         configureCommon()
+        
+        dependsOn(vanillaDownloads)
+        this.lockFile.set(lockFile)
         
         vanillaServer.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverJar))
         devBundleZip.set(bundleZip)
@@ -123,13 +124,15 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
         minecraftVersion.set(mcVersion)
         javaLauncher.set(launcher)
         
-        patchedJar.set(workDir.map { it.file("paperclip/paperclip-patched.jar") })
+        patchedJar.set(sharedWorkDir.map { it.file("paperclip/paperclip-patched.jar") })
     }
     
     val widenJar = tasks.register<WidenTask.Jar>("_oriWidenJar") {
         configureCommon()
+        
+        dependsOn(applyBinDiff)
         input.set(applyBinDiff.flatMap(ApplyBinDiffTask::patchedJar))
-        output.set(workDir.map { it.file("widened/paper-server-widened.jar") })
+        output.set(layout.buildDirectory.file("origami/paper-server-widened.jar"))
     }
     
     val installJar = tasks.register<InstallTask.Artifact>("_oriInstallJar") {
@@ -143,6 +146,9 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
     val remap = tasks.register<RemapTask>("_oriRemap") {
         configureCommon()
         
+        dependsOn(vanillaDownloads)
+        this.lockFile.set(lockFile)
+        
         vanillaServer.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverJar))
         vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
         mappings.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverMappings))
@@ -152,11 +158,14 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
         remapperArgs.set(macheConfig.map { it.remapperArgs })
         javaLauncher.set(launcher)
         minecraftVersion.set(mcVersion)
-        remappedJar.set(workDir.map { it.file("remapped/server-remapped.jar") })
+        remappedJar.set(sharedWorkDir.map { it.file("remapped/server-remapped.jar") })
     }
     
     val decompile = tasks.register<DecompileTask>("_oriDecompile") {
         configureCommon()
+        
+        dependsOn(vanillaDownloads, remap)
+        this.lockFile.set(lockFile)
         
         remappedJar.set(remap.flatMap(RemapTask::remappedJar))
         vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
@@ -165,18 +174,21 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
         macheFile.set(macheZip)
         javaLauncher.set(launcher)
         minecraftVersion.set(mcVersion)
-        decompiledSources.set(workDir.map { it.file("decompiled/server-decompiled.jar") })
+        decompiledSources.set(sharedWorkDir.map { it.file("decompiled/server-decompiled.jar") })
     }
     
     val applyPatches = tasks.register<ApplyPaperPatchesTask>("_oriApplyPaperPatches") {
         configureCommon()
+        
+        dependsOn(decompile)
+        this.lockFile.set(lockFile)
         
         devBundleZip.set(bundleZip)
         vanillaSources.set(decompile.flatMap(DecompileTask::decompiledSources))
         minecraftVersion.set(mcVersion)
         patchesRootName.set(devBundleInfo.map(DevBundle::patchDir))
         
-        val workDir = workDir.map { it.dir("decompiled-patched") }
+        val workDir = sharedWorkDir.map { it.dir("decompiled-patched") }
         patchedJar.set(workDir.map { it.file("server-patched.jar") })
         newSources.set(workDir.map { it.dir("new-sources") })
         patchedSources.set(workDir.map { it.dir("patched-sources") })
@@ -184,11 +196,13 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
     
     val widenSources = tasks.register<WidenTask.SourcesJar>("_oriWidenSourcesJar") {
         configureCommon()
+        
+        dependsOn(vanillaDownloads, applyPatches)
         newSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::newSources))
         patchedSourcesDir.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedSources))
         librariesDir.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
         input.set(applyPatches.flatMap(ApplyPaperPatchesTask::patchedJar))
-        output.set(workDir.map { it.file("widened/paper-server-widened-sources.jar") })
+        output.set(layout.buildDirectory.file("origami/paper-server-widened-sources.jar"))
     }
     
     val installSourcesJar = tasks.register<InstallTask.Artifact>("_oriInstallSourcesJar") {

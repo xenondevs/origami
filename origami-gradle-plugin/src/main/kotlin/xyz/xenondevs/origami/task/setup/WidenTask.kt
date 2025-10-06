@@ -56,7 +56,7 @@ import kotlin.time.measureTime
 
 // TODO: include craftbukkit sources
 @CacheableTask
-abstract class WidenTask : DefaultTask() {
+internal abstract class WidenTask : DefaultTask() {
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NAME_ONLY)

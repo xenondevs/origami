@@ -3,22 +3,22 @@ package xyz.xenondevs.origami.task.setup
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.CacheableTask
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.jvm.toolchain.JavaLauncher
+import xyz.xenondevs.origami.util.withLock
 import java.nio.file.FileSystems
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import javax.inject.Inject
 
-@CacheableTask
-abstract class ApplyBinDiffTask @Inject constructor() : DefaultTask() {
+internal abstract class ApplyBinDiffTask : DefaultTask() {
+    
+    @get:Internal
+    abstract val lockFile: RegularFileProperty
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
@@ -37,11 +37,20 @@ abstract class ApplyBinDiffTask @Inject constructor() : DefaultTask() {
     @get:Internal
     abstract val javaLauncher: Property<JavaLauncher>
     
-    @get:OutputFile
+    @get:Internal
     abstract val patchedJar: RegularFileProperty
     
+    init {
+        outputs.upToDateWhen { (it as ApplyBinDiffTask).patchedJar.get().asFile.exists() }
+    }
+    
     @TaskAction
-    fun apply() {
+    fun apply(): Unit = withLock(lockFile) {
+        if (patchedJar.get().asFile.exists()) {
+            logger.info("ApplyBinDiff already completed, skipping")
+            return
+        }
+        
         val mcVersion = minecraftVersion.get()
         val tempPaperclip = temporaryDir.resolve("paperclip-$mcVersion.jar")
         logger.info("Running Paperclip bin diff for $mcVersion")
@@ -84,7 +93,7 @@ abstract class ApplyBinDiffTask @Inject constructor() : DefaultTask() {
         val patched = temporaryDir.resolve("versions/$jarPath")
         check(patched.exists()) { "Patched jar not found at ${patched.absolutePath}" }
         
-        Files.copy(patched.toPath(), patchedJar.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        patched.copyTo(patchedJar.get().asFile.apply { parentFile.mkdirs() }, true)
     }
     
 }
