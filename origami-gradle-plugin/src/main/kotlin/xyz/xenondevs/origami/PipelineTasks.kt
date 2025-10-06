@@ -88,7 +88,16 @@ fun Project.registerTasks(dl: Provider<DownloaderService>, plugin: OrigamiPlugin
     
     val installPom = tasks.register<InstallTask.Pom>("_oriInstallPom") {
         configureCommon()
-        paperClasspathConfig.set(project.configurations.named(DEV_BUNDLE_COMPILE_CLASSPATH))
+        serverDependencies.set(
+            project.configurations.named(DEV_BUNDLE_COMPILE_CLASSPATH).map { cfg ->
+                cfg.incoming.resolutionResult.root.dependencies
+                    .filterIsInstance<ResolvedDependencyResult>()
+                    .single().selected.dependencies
+                    .filterIsInstance<ResolvedDependencyResult>()
+                    .mapNotNull { it.selected.id as? ModuleComponentIdentifier }
+                    .map { "${it.group}:${it.module}:${it.version}" }
+            }
+        )
     }
     
     val vanillaDownloads = tasks.register<VanillaDownloadTask>("_oriVanillaDownload") {

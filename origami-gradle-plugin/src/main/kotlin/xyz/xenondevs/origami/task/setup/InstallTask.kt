@@ -1,18 +1,17 @@
 package xyz.xenondevs.origami.task.setup
 
 import org.gradle.api.DefaultTask
-import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.component.ModuleComponentIdentifier
-import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
+import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.property
 import java.io.File
 import javax.inject.Inject
@@ -20,7 +19,7 @@ import javax.xml.XMLConstants
 import javax.xml.stream.XMLOutputFactory
 import javax.xml.stream.XMLStreamWriter
 
-abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
+internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
     
     @get:Input
     val group: Property<String> = objects.property()
@@ -87,8 +86,8 @@ abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
     
     abstract class Pom @Inject constructor(objects: ObjectFactory) : InstallTask(objects) {
         
-        @get:Internal
-        val paperClasspathConfig: Property<Configuration> = objects.property()
+        @get:Input
+        val serverDependencies: ListProperty<String> = objects.listProperty()
         
         @get:OutputFile
         override val target: RegularFileProperty = objects.fileProperty()
@@ -103,20 +102,7 @@ abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
             )
         
         override fun install() {
-            val root = paperClasspathConfig.get()
-                .incoming
-                .resolutionResult
-                .root
-                .dependencies
-                .filterIsInstance<ResolvedDependencyResult>()
-                .single()
-                .selected
-            
-            val deps = root.dependencies
-                .filterIsInstance<ResolvedDependencyResult>()
-                .mapNotNull { it.selected.id as? ModuleComponentIdentifier }
-            
-            installPom(group.get(), name.get(), version.get(), target.get().asFile, deps)
+            installPom(group.get(), name.get(), version.get(), target.get().asFile, serverDependencies.get())
         }
         
         private fun installPom(
@@ -124,7 +110,7 @@ abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
             name: String,
             version: String,
             pom: File,
-            dependencies: List<ModuleComponentIdentifier>
+            dependencies: List<String>
         ) {
             pom.parentFile.mkdirs()
             pom.outputStream().buffered().use { out ->
@@ -142,8 +128,9 @@ abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
                 
                 writer.writeStartElement("dependencies")
                 for (dep in dependencies) {
+                    val (group, module, version) = dep.split(':', limit = 3)
                     writer.writeStartElement("dependency")
-                    writer.writeCoordinates(dep.group, dep.module, dep.version)
+                    writer.writeCoordinates(group, module, version)
                     writer.writeEndElement()
                 }
                 writer.writeEndElement()
