@@ -27,19 +27,19 @@ object DynamicInvoker {
     
     val PLUGIN_PROXY_NAME = PluginProxy::class.internalName
     
-    val METHOD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMethod", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
+    val METHOD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMethod", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
     
-    val CONSTRUCTOR_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyConstructor", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+    val CONSTRUCTOR_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyConstructor", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
-    val FIELD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyField", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
+    val FIELD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyField", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
     
-    val METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMetafactory", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
+    val METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
     
-    val SWITCH_BOOTSTRAPS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxySwitch", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+    val SWITCH_BOOTSTRAPS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxySwitch", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
-    val INSTANCE_OF_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyInstanceOf", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+    val INSTANCE_OF_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyInstanceOf", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
-    val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyClass", "(Ljava/lang/invoke/MethodHandles\$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+    val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyClass", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
     fun transform(clazz: ClassNode, pluginName: String) {
         val currentMixin = clazz.name

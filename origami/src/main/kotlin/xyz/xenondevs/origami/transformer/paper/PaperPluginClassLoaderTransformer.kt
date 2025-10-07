@@ -16,8 +16,8 @@ import xyz.xenondevs.origami.util.internalName
 
 object PaperPluginClassLoaderTransformer : PaperTransformer {
     
-    private const val REQUIRED_CLASSES_FIELD = "origami\$requiredClasses"
-    private const val PLUGIN_NAME_FIELD = "origami\$pluginName"
+    private const val REQUIRED_CLASSES_FIELD = $$"origami$requiredClasses"
+    private const val PLUGIN_NAME_FIELD = $$"origami$pluginName"
     
     override val className = "io/papermc/paper/plugin/entrypoint/classloader/PaperPluginClassLoader"
     
@@ -63,7 +63,7 @@ object PaperPluginClassLoaderTransformer : PaperTransformer {
             addLabel()
             aLoad(0)
             getField(clazz.name, PLUGIN_NAME_FIELD, "Ljava/lang/String;")
-            invokeStatic(LookupProxy::class.internalName, "createLookupClass", "(Ljava/lang/String;)Lxyz/xenondevs/origami/asm/LookupProxy\$LookupClassDefinition;")
+            invokeStatic(LookupProxy::class.internalName, "createLookupClass", $$"(Ljava/lang/String;)Lxyz/xenondevs/origami/asm/LookupProxy$LookupClassDefinition;")
             aStore(newLocal)
             
             addLabel()

@@ -20,7 +20,7 @@ import java.lang.invoke.MethodHandle
 import java.lang.invoke.MethodType
 import java.util.concurrent.ConcurrentHashMap
 
-private const val LOGGER_WRAPPER_NAME = "Origami\$LoggerWrapper"
+private const val LOGGER_WRAPPER_NAME = $$"Origami$LoggerWrapper"
 
 /**
  * Lets mixins use Minecraft's logger implementation.

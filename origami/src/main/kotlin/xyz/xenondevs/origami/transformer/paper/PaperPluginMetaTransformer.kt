@@ -3,6 +3,7 @@ package xyz.xenondevs.origami.transformer.paper
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.ClassNode
 import org.objectweb.asm.tree.FieldNode
+import java.lang.invoke.MethodHandles
 
 /**
  * Note that the field added by this transformer is not meant to be used as a yml configuration option. It is just added
@@ -11,7 +12,7 @@ import org.objectweb.asm.tree.FieldNode
  */
 object PaperPluginMetaTransformer : PaperTransformer {
     
-    const val ENABLED_FIELD = "origami\$enabled"
+    const val ENABLED_FIELD = $$"origami$enabled"
     
     override val className = "io/papermc/paper/plugin/provider/configuration/PaperPluginMeta"
     

@@ -9,7 +9,7 @@ import xyz.xenondevs.origami.util.buildInsnList
 import xyz.xenondevs.origami.util.internalName
 import java.lang.invoke.MethodHandles
 
-private const val LOOKUP_PREFIX = "Origami\$LookupProxy"
+private const val LOOKUP_PREFIX = $$"Origami$LookupProxy"
 
 // TODO: thread safety
 object LookupProxy {
@@ -60,10 +60,10 @@ object LookupProxy {
             methods.add(MethodNode().apply {
                 access = Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC
                 name = "getLookup"
-                desc = "()Ljava/lang/invoke/MethodHandles\$Lookup;"
+                desc = $$"()Ljava/lang/invoke/MethodHandles$Lookup;"
                 instructions = buildInsnList {
                     addLabel()
-                    invokeStatic(MethodHandles::class.internalName, "lookup", "()Ljava/lang/invoke/MethodHandles\$Lookup;")
+                    invokeStatic(MethodHandles::class.internalName, "lookup", $$"()Ljava/lang/invoke/MethodHandles$Lookup;")
                     areturn()
                 }
             })
