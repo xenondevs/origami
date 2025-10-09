@@ -3,6 +3,7 @@ package xyz.xenondevs.origami.extension
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.CopySpec
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.ProjectLayout
 import org.gradle.api.invocation.Gradle
@@ -48,12 +49,12 @@ abstract class OrigamiExtension @Inject constructor(
     val transitiveAccessWidenerSources: ConfigurableFileCollection = objects.fileCollection()
     
     /**
-     * The input files to be used for the `origamiJar` task.
+     * The [CopySpec] to merge into `origamiJar`.
      *
-     * Defaults the input of the `jar` task.
+     * Defaults to the `jar` task.
      */
-    val input: ConfigurableFileCollection = objects.fileCollection()
-        .convention(project.tasks.named<Jar>("jar").map { it.source })
+    val input: Property<CopySpec> = objects.property<CopySpec>()
+        .convention(project.tasks.named<Jar>("jar"))
     
     /**
      * The name of the directory inside the jar containing origami's bundled libraries.
