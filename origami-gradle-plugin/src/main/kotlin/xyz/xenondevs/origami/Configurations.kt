@@ -32,7 +32,8 @@ internal fun Project.registerConfigurations() {
             )
         }
         register(CODEBOOK_CONFIG) { isTransitive = false }
-        register(PARCHMENT_CONFIG) { isTransitive = false }
+        register(PARAM_MAPPINGS_CONFIG) { isTransitive = false }
+        register(CONSTANTS_CONFIG) { isTransitive = false }
         register(REMAPPER_CONFIG) { isTransitive = false }
         register(DECOMPILER_CONFIG) { isTransitive = false }
         

@@ -9,6 +9,7 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
@@ -37,6 +38,11 @@ internal abstract class RemapTask : DefaultTask() {
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
     abstract val paramMappings: RegularFileProperty
+    
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    @get:Optional
+    abstract val constants: RegularFileProperty
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
@@ -78,7 +84,7 @@ internal abstract class RemapTask : DefaultTask() {
             .toList()
         
         val args = remapperArgs.get().map { arg ->
-            arg
+            var newArg = arg
                 .replace("{tempDir}", temporaryDir.absolutePath)
                 .replace("{remapperFile}", remapper.get().asFile.absolutePath)
                 .replace("{mappingsFile}", mappings.get().asFile.absolutePath)
@@ -86,7 +92,10 @@ internal abstract class RemapTask : DefaultTask() {
                 .replace("{output}", tempOut.absolutePath)
                 .replace("{input}", vanillaServer.get().asFile.absolutePath)
                 .replace("{inputClasspath}", libraries.joinToString(":") { it.absolutePath })
-            //                .replace("{constantsFile}", "")
+            if (constants.isPresent)
+                newArg = newArg.replace("{constantsFile}", constants.get().asFile.absolutePath)
+            
+            newArg
         }
         
         val codebookLog = temporaryDir.resolve("codebook.log")

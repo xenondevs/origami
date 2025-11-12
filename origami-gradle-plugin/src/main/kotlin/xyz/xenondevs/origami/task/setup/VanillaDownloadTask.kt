@@ -64,7 +64,7 @@ internal abstract class VanillaDownloadTask @Inject constructor(objects: ObjectF
             mappingsUrl = downloads["server_mappings"]!!.url
         }
         
-        val pool = AsyncUtils.createPool("vanilla-downloads", threadCount = 4)
+        val pool = AsyncUtils.createPool("vanilla-downloads", threadCount = 2)
         pool.execute { downloadServerAndLibraries(serverUrl) }
         pool.execute { download(mappingsUrl, serverMappings.get().asFile) }
         pool.shutdown()

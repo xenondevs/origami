@@ -12,7 +12,7 @@ plugins {
 
 subprojects {
     group = "xyz.xenondevs.origami"
-    version = "0.3.0"
+    version = "0.3.1"
     
     repositories { configureRepos() }
     

@@ -3,7 +3,6 @@ package xyz.xenondevs.origami
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
-import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
@@ -56,7 +55,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     @Suppress("ReplaceSizeCheckWithIsNotEmpty") // broken for DependencySet
     val hasDevBundle: Provider<Boolean> = configurations.named(DEV_BUNDLE_CONFIG).map { it.allDependencies.size != 0 }
     
-    dependencies.addDependenciesToPipelineConfigs(devBundleInfo, macheConfig)
+    addDependenciesToPipelineConfigs(devBundleInfo, macheConfig)
     
     val clean = tasks.register<Delete>("_oriClean") {
         group = ORIGAMI_TASK_GROUP
@@ -152,7 +151,8 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         vanillaServer.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverJar))
         vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
         mappings.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverMappings))
-        paramMappings.set(configurations.named(PARCHMENT_CONFIG).map { it.singleFile }.toRegular())
+        paramMappings.set(configurations.named(PARAM_MAPPINGS_CONFIG).map { it.singleFile }.toRegular())
+        constants.set(configurations.named(CONSTANTS_CONFIG).filter { !it.isEmpty }.map { it.singleFile }.toRegular())
         codebook.set(configurations.named(CODEBOOK_CONFIG).map { it.singleFile }.toRegular())
         remapper.set(configurations.named(REMAPPER_CONFIG).map { it.singleFile }.toRegular())
         remapperArgs.set(macheConfig.map { it.remapperArgs })
@@ -255,7 +255,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
                     content {
                         repo.groups.forEach(::includeGroupAndSubgroups)
                         onlyForConfigurations(
-                            CODEBOOK_CONFIG, PARCHMENT_CONFIG, REMAPPER_CONFIG, DECOMPILER_CONFIG
+                            CODEBOOK_CONFIG, PARAM_MAPPINGS_CONFIG, CONSTANTS_CONFIG, REMAPPER_CONFIG, DECOMPILER_CONFIG
                         )
                     }
                 }
@@ -264,25 +264,48 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     }
 }
 
-private fun DependencyHandler.addDependenciesToPipelineConfigs(devBundleInfo: Provider<DevBundle>, macheConfig: Provider<MacheConfig>) {
-    addProvider(
-        MACHE_CONFIG,
-        devBundleInfo.map { it.mache.coordinates.first() }
-    )
-    addProvider(
-        CODEBOOK_CONFIG,
-        macheConfig.map { it.dependencies.codebook.first().toDependencyString() }
-    )
-    addProvider(
-        PARCHMENT_CONFIG,
-        macheConfig.map { it.dependencies.paramMappings.first().toDependencyString() }
-    )
-    addProvider(
-        REMAPPER_CONFIG,
-        macheConfig.map { it.dependencies.remapper.first().toDependencyString() }
-    )
-    addProvider(
-        DECOMPILER_CONFIG,
-        macheConfig.map { it.dependencies.decompiler.first().toDependencyString() }
-    )
+private fun Project.addDependenciesToPipelineConfigs(devBundleInfo: Provider<DevBundle>, macheConfig: Provider<MacheConfig>) {
+    val deps = this.dependencies
+    this.configurations.apply {
+        named(MACHE_CONFIG) {
+            defaultDependencies {
+                addAllLater(devBundleInfo.map { it.mache.coordinates.map(deps::create) })
+            }
+        }
+        named(CODEBOOK_CONFIG) {
+            defaultDependencies {
+                addAllLater(macheConfig.map { mache ->
+                    mache.dependencies.codebook.map { deps.create(it.toDependencyString()) }
+                })
+            }
+        }
+        named(PARAM_MAPPINGS_CONFIG) {
+            defaultDependencies {
+                addAllLater(macheConfig.map { mache ->
+                    mache.dependencies.paramMappings.map { deps.create(it.toDependencyString()) }
+                })
+            }
+        }
+        named(CONSTANTS_CONFIG) {
+            defaultDependencies {
+                addAllLater(macheConfig.map { mache ->
+                    mache.dependencies.constants.map { deps.create(it.toDependencyString()) }
+                })
+            }
+        }
+        named(REMAPPER_CONFIG) {
+            defaultDependencies {
+                addAllLater(macheConfig.map { mache ->
+                    mache.dependencies.remapper.map { deps.create(it.toDependencyString()) }
+                })
+            }
+        }
+        named(DECOMPILER_CONFIG) {
+            defaultDependencies {
+                addAllLater(macheConfig.map { mache ->
+                    mache.dependencies.decompiler.map { deps.create(it.toDependencyString()) }
+                })
+            }
+        }
+    }
 }
