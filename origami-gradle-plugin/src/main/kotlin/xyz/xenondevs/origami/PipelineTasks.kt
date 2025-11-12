@@ -18,13 +18,14 @@ import org.gradle.kotlin.dsl.of
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.repositories
 import xyz.xenondevs.origami.extension.OrigamiExtension
+import xyz.xenondevs.origami.task.patch.ChainedVisitor
+import xyz.xenondevs.origami.task.patch.PatchServerTask
 import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.task.setup.ApplyPaperPatchesTask
 import xyz.xenondevs.origami.task.setup.DecompileTask
 import xyz.xenondevs.origami.task.setup.InstallTask
 import xyz.xenondevs.origami.task.setup.RemapTask
 import xyz.xenondevs.origami.task.setup.VanillaDownloadTask
-import xyz.xenondevs.origami.task.setup.WidenTask
 import xyz.xenondevs.origami.util.getIdeaSourcesDownloadTasks
 import xyz.xenondevs.origami.util.isIdeaSync
 import xyz.xenondevs.origami.util.prependTaskRequest
@@ -34,6 +35,7 @@ import xyz.xenondevs.origami.value.DevBundleValueSource
 import xyz.xenondevs.origami.value.MacheConfig
 import xyz.xenondevs.origami.value.MacheConfigValueSource
 import java.io.File
+import java.util.concurrent.atomic.AtomicReference
 
 fun Project.registerTasks(plugin: OrigamiPlugin) {
     fun Provider<File>.toRegular() = layout.file(this)
@@ -78,9 +80,11 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         version.set(ext.devBundleVersion)
     }
     
-    fun WidenTask.configureCommon() {
+    val sharedVisitorRef = AtomicReference<ChainedVisitor>()
+    fun PatchServerTask.configureCommon() {
         (this as Task).configureCommon()
         
+        visitor.set(sharedVisitorRef)
         accessWidenerFile.set(ext.pluginId
             .map { id -> 
                 listOf(
@@ -130,7 +134,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         patchedJar.set(sharedWorkDir.map { it.file("paperclip/paperclip-patched.jar") })
     }
     
-    val widenJar = tasks.register<WidenTask.Jar>("_oriWidenJar") {
+    val widenJar = tasks.register<PatchServerTask.Jar>("_oriWidenJar") {
         configureCommon()
         
         dependsOn(applyBinDiff)
@@ -141,7 +145,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     val installJar = tasks.register<InstallTask.Artifact>("_oriInstallJar") {
         configureCommon()
         dependsOn(installPom)
-        source.set(widenJar.flatMap(WidenTask::output))
+        source.set(widenJar.flatMap(PatchServerTask::output))
     }
     //</editor-fold>
     
@@ -198,7 +202,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         patchedSources.set(workDir.map { it.dir("patched-sources") })
     }
     
-    val widenSources = tasks.register<WidenTask.SourcesJar>("_oriWidenSourcesJar") {
+    val widenSources = tasks.register<PatchServerTask.SourcesJar>("_oriWidenSourcesJar") {
         configureCommon()
         
         dependsOn(vanillaDownloads, applyPatches)
@@ -213,7 +217,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         configureCommon()
         dependsOn(installPom)
         classifier.set("sources")
-        source.set(widenSources.flatMap(WidenTask::output))
+        source.set(widenSources.flatMap(PatchServerTask::output))
     }
     //</editor-fold>
     
