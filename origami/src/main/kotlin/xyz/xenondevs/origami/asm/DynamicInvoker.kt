@@ -15,11 +15,34 @@ import org.objectweb.asm.tree.TypeInsnNode
 import xyz.xenondevs.origami.Origami
 import xyz.xenondevs.origami.PluginProxy
 import xyz.xenondevs.origami.PluginProxy.HandleType
+import xyz.xenondevs.origami.asm.DynamicInvoker.fixType
 import xyz.xenondevs.origami.util.internalName
 
 private typealias InsnIterator = MutableListIterator<AbstractInsnNode>
 
-// TODO: Referencing other plugins from within mixins
+/**
+ * Transforms mixin classes to replace all references to plugin classes with `java/lang/Object` and replaces method
+ * calls/field accesses with `invokedynamics` that will be linked to method handles provided by [PluginProxy] at runtime.
+ * Also tells [PluginProxy] which method handles will actually be needed for the plugin.
+ *
+ * TODO:
+ * - Handle plugin class hierarchies properly to allow passing plugin class instances to methods expecting vanilla super
+ *   classes (see [fixType])
+ * - Run during compile time to speed up startup time. We'll still need to keep it present in runtime for legacy versions
+ *   (origami-common?). Can use some annotation to mark transformed mixins to distinguish.
+ * - Accessing other plugin classes from within mixins. Currently this invoker always assumes any non-Minecraft class is
+ *   a class from the plugin the mixin belongs to. Obviously could also be a class from another plugin the current one
+ *   depends on.
+ * - Interfaces: From my understanding, this would require full codebase scanning and stack frame analysis to fully track
+ *   where and how any instance of a plugin interface is being used to then replace whatever object with a proxy defined
+ *   in the plugin's classloader. This proxy would implement said interface and just forward all calls to some handler
+ *   that contains the original implementation from the Mixin. This would obviously be quite complex to do across huge
+ *   plugins so doing it during compile time would be best. However, when some other plugin depends on the plugin that
+ *   owns the interface but doesn't itself have the origami gradle plugin, we would pretty much always be forced to scan
+ *   the entire thing at runtime. I am in general not sure if there are remaining use cases of adding interfaces to
+ *   Minecraft classes given we generate accessors for any added members anyway and support access wideners that would
+ *   justify this somewhat heavy performance hit (be that during build or runtime).
+ */
 object DynamicInvoker {
     
     val minecraftClassPath
@@ -71,7 +94,8 @@ object DynamicInvoker {
         when (insn.opcode) {
             Opcodes.NEW -> {
                 if (insn.next.opcode != Opcodes.DUP) {
-                    // TODO: new call without doing anything with the result
+                    // TODO: new call without doing anything with the result might be optimized to drop the dup in the
+                    //       future. Haven't seen javac ever produce this yet tho.
                     throw IllegalStateException("Unknown object allocation pattern. Expected DUP after NEW")
                 }
                 // Plugin class allocations can be omitted since the constructor method handle will create the object.
@@ -235,13 +259,21 @@ object DynamicInvoker {
         return minecraftClassPath.getClass(internalName) == null && internalName != currentClass
     }
     
+    /**
+     * TODO:
+     *
+     * This currently leads to issues when passing a plugin class instance that has some vanilla super class in its
+     * hierarchy to a method that expects the vanilla type, since the frame asm generates will have a `java/lang/Object`
+     * type instead of the actual vanilla super class. One common example where this issue can occur is calling custom
+     * Bukkit events from within a Mixin. To fix this properly, we'll need to build class hierarchies for plugins and
+     * find the first non-plugin super class to use that as the type. Problem with that is that Paper plugins can
+     * [configure their own library loaders](https://docs.papermc.io/paper/dev/getting-started/paper-plugins/#loaders)
+     * (another benefit of doing it during compile time).
+     */
     private fun fixType(type: Type, currentClass: String): Type {
         return when (type.sort) {
             Type.OBJECT -> {
                 if (isPluginClass(type.internalName, currentClass)) {
-                    // TODO | this could in theory be optimized to instead search for the first superclass that is not a
-                    // TODO | plugin class to support better frame optimizations by the JVM. In turn, this would obviously
-                    // TODO | also require to build a class hierarchy for server and default library classes.
                     OBJECT_TYPE
                 } else {
                     type
