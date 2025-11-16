@@ -82,8 +82,12 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         (this as Task).configureCommon()
         
         accessWidenerFile.set(ext.pluginId
-            .map { id -> layout.projectDirectory.file("src/main/resources/$id.accesswidener") }
-            .filter { it.asFile.exists() }
+            .map { id -> 
+                listOf(
+                    "src/main/resources/$id.accesswidener",
+                    "src/main/resources/$id.aw"
+                ).map { layout.projectDirectory.file(it) }.firstOrNull { it.asFile.exists() }
+            }.filter { it != null }
         )
         transitiveAccessWidenerSources.from(ext.transitiveAccessWidenerSources)
     }
