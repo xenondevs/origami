@@ -17,7 +17,7 @@ import xyz.xenondevs.origami.task.patch.source.WidenerSourceVisitor
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
-class WidenerPatch(
+internal class WidenerPatch(
     accessWidenerFile: RegularFileProperty,
     transitiveAccessWidenerSources: ConfigurableFileCollection,
     logger: Logger

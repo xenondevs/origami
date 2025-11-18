@@ -28,7 +28,7 @@ private val ORDER = listOf(
     Modifier.Keyword.SYNCHRONIZED, Modifier.Keyword.NATIVE, Modifier.Keyword.STRICTFP
 )
 
-class WidenerSourceVisitor(
+internal class WidenerSourceVisitor(
     private val widenerConfig: AccessWidenerConfig
 ) : SourceVisitor {
     

@@ -10,7 +10,7 @@ import java.util.*
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 
-class ChainedVisitor {
+internal class ChainedVisitor {
     
     val patches = LinkedList<PatchType>()
     

@@ -5,7 +5,7 @@ import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade
 import org.objectweb.asm.ClassVisitor
 import java.util.zip.ZipEntry
 
-abstract class PatchType {
+internal abstract class PatchType {
 
     abstract fun isEnabled(): Boolean
     
@@ -17,7 +17,7 @@ abstract class PatchType {
     
 }
 
-interface SourceVisitor {
+internal interface SourceVisitor {
     
     fun visit(cu: CompilationUnit, serverFacade: JavaParserFacade)
     
