@@ -3,6 +3,7 @@ package xyz.xenondevs.origami.task.patch
 import com.github.javaparser.JavaParser
 import com.github.javaparser.ParserConfiguration
 import com.github.javaparser.ParserConfiguration.LanguageLevel
+import com.github.javaparser.printer.lexicalpreservation.LexicalPreservingPrinter
 import com.github.javaparser.symbolsolver.JavaSymbolSolver
 import com.github.javaparser.symbolsolver.javaparsermodel.JavaParserFacade
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver
@@ -155,6 +156,7 @@ internal abstract class PatchServerTask : DefaultTask() {
             val parserCfg = ParserConfiguration()
                 .setSymbolResolver(symbolSolver)
                 .setLanguageLevel(LanguageLevel.CURRENT)
+                .setLexicalPreservationEnabled(true)
             val javaParser = JavaParser(parserCfg)
             val parserFacade = JavaParserFacade.get(typeSolver)
             
@@ -170,7 +172,7 @@ internal abstract class PatchServerTask : DefaultTask() {
                             .orElseThrow { IllegalStateException("Cannot parse $name") }
                         
                         visitor.processSource(cu, parserFacade)
-                        out.write(cu.toString().toByteArray())
+                        out.write(LexicalPreservingPrinter.print(cu).toByteArray())
                     } else {
                         inp.copyTo(out)
                     }
