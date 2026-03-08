@@ -1,6 +1,6 @@
 plugins {
-    `maven-publish`
     `version-catalog`
+    id("origami.publish-conventions")
 }
 
 catalog {
@@ -22,16 +22,6 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["versionCatalog"])
-        }
-    }
-    
-    repositories {
-        maven {
-            credentials {
-                name = "xenondevs"
-                url = uri { "https://repo.xenondevs.xyz/releases/" }
-                credentials(PasswordCredentials::class)
-            }
         }
     }
 }

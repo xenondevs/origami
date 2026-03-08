@@ -1,10 +1,7 @@
 plugins {
     `kotlin-dsl`
-    `maven-publish`
-}
-
-repositories {
-    mavenCentral()
+    id("origami.kotlin-conventions")
+    id("origami.publish-conventions")
 }
 
 dependencies {
@@ -21,28 +18,6 @@ gradlePlugin {
             version = project.version
             id = "xyz.xenondevs.origami"
             implementationClass = "xyz.xenondevs.origami.OrigamiPlugin"
-        }
-    }
-}
-
-java {
-    withSourcesJar()
-}
-
-kotlin {
-    compilerOptions {
-        optIn.add("kotlin.time.ExperimentalTime")
-    }
-}
-
-publishing {
-    repositories {
-        maven {
-            credentials {
-                name = "xenondevs"
-                url = uri { "https://repo.xenondevs.xyz/releases/" }
-                credentials(PasswordCredentials::class)
-            }
         }
     }
 }
