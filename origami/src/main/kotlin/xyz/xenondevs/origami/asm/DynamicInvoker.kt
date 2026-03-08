@@ -184,7 +184,7 @@ object DynamicInvoker {
                 val interfaceType = insn.bsmArgs[0] as Type
                 iter.set(InvokeDynamicInsnNode(
                     insn.name,
-                    insn.desc,
+                    fixDesc(insn.desc, currentClass),
                     METAFACTORY_PROXY_HANDLE,
                     pluginName,
                     interfaceType,
@@ -202,7 +202,7 @@ object DynamicInvoker {
                 if (types.any { isPluginClass(it, currentClass) }) {
                     iter.set(InvokeDynamicInsnNode(
                         insn.name,
-                        insn.desc,
+                        fixDesc(insn.desc, currentClass),
                         SWITCH_BOOTSTRAPS_PROXY_HANDLE,
                         pluginName,
                         0,
