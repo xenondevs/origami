@@ -15,7 +15,7 @@ internal inline fun <reified T : Any> ObjectFactory.providerSet(
     vararg providers: Provider<out T>
 ): Provider<Set<T>> = combinedProvider(setProperty<T>(), { set, item -> set + item}, *providers)
 
-internal fun <T, C : Collection<T>> combinedProvider(
+internal fun <T : Any, C : Collection<T>> combinedProvider(
     initial: Provider<C>,
     append: (C, T) -> C,
     vararg providers: Provider<out T>
