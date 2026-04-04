@@ -15,14 +15,14 @@ internal inline fun <reified T : Any> ObjectFactory.providerSet(
     vararg providers: Provider<out T>
 ): Provider<Set<T>> = combinedProvider(setProperty<T>(), { set, item -> set + item}, *providers)
 
-internal fun <T, C : Collection<T>> combinedProvider(
+internal fun <T: Any, C : Collection<T>> combinedProvider(
     initial: Provider<C>,
     append: (C, T) -> C,
     vararg providers: Provider<out T>
 ): Provider<C> = providers.fold(initial) { acc, provider -> acc.zip(provider) { col, add -> append(col, add) } }
 
 internal fun prependTaskRequest(start: StartParameter, task: TaskProvider<*>) {
-    start.setTaskRequests(buildList { 
+    start.setTaskRequests(buildList {
         add(DefaultTaskExecutionRequest(listOf(task.name)))
         addAll(start.taskRequests)
     })
@@ -37,11 +37,11 @@ internal fun getIdeaSourcesDownloadTasks(project: Project, sources: InstallTask.
         .flatMap { it.dependencies }
         .filterIsInstance<ExternalModuleDependency>()
         .flatMap { dependency -> dependency.artifacts.asSequence().map { artifact -> dependency to artifact } }
-        .any { (dependency, artifact) -> 
-            dependency.group == sources.group.get() 
-                && dependency.name == sources.name.get() 
-                && artifact.extension == sources.extension.get() 
-                && artifact.classifier == sources.classifier.get() 
+        .any { (dependency, artifact) ->
+            dependency.group == sources.group.get()
+                && dependency.name == sources.name.get()
+                && artifact.extension == sources.extension.get()
+                && artifact.classifier == sources.classifier.get()
                 && dependency.version == sources.version.get()
         }
     

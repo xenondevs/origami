@@ -22,7 +22,7 @@ import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.task.setup.ApplyPaperPatchesTask
 import xyz.xenondevs.origami.task.setup.DecompileTask
 import xyz.xenondevs.origami.task.setup.InstallTask
-import xyz.xenondevs.origami.task.setup.RemapTask
+import xyz.xenondevs.origami.task.setup.CodebookTask
 import xyz.xenondevs.origami.task.setup.VanillaDownloadTask
 import xyz.xenondevs.origami.task.setup.WidenTask
 import xyz.xenondevs.origami.util.getIdeaSourcesDownloadTasks
@@ -54,6 +54,13 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     
     @Suppress("ReplaceSizeCheckWithIsNotEmpty") // broken for DependencySet
     val hasDevBundle: Provider<Boolean> = configurations.named(DEV_BUNDLE_CONFIG).map { it.allDependencies.size != 0 }
+    val resolvedDevBundleVersion: Provider<String> = configurations.named(DEV_BUNDLE_CONFIG).map { cfg ->
+        val selectedId = cfg.incoming.resolutionResult.root.dependencies
+            .filterIsInstance<ResolvedDependencyResult>()
+            .single().selected.id
+        (selectedId as? ModuleComponentIdentifier)?.version
+            ?: error("Expected $DEV_BUNDLE_CONFIG to resolve to a module component, but got $selectedId")
+    }
     
     addDependenciesToPipelineConfigs(devBundleInfo, macheConfig)
     
@@ -75,14 +82,14 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         localRepo.set(plugin.localRepo)
         group.set("xyz.xenondevs.origami.patched-server")
         name.set("widened-server-${project.name}")
-        version.set(ext.devBundleVersion)
+        version.set(resolvedDevBundleVersion)
     }
     
     fun WidenTask.configureCommon() {
         (this as Task).configureCommon()
         
         accessWidenerFile.set(ext.pluginId
-            .map { id -> 
+            .map { id ->
                 listOf(
                     "src/main/resources/$id.accesswidener",
                     "src/main/resources/$id.aw"
@@ -146,7 +153,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     //</editor-fold>
     
     //<editor-fold desc="sources pipeline">
-    val remap = tasks.register<RemapTask>("_oriRemap") {
+    val remap = tasks.register<CodebookTask>("_oriCodebook") {
         configureCommon()
         
         dependsOn(vanillaDownloads)
@@ -154,11 +161,11 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         
         vanillaServer.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverJar))
         vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
-        mappings.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverMappings))
-        paramMappings.set(configurations.named(PARAM_MAPPINGS_CONFIG).map { it.singleFile }.toRegular())
+        mappings.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverMappings).filter { it.asFile.exists() })
+        paramMappings.set(configurations.named(PARAM_MAPPINGS_CONFIG).filter { !it.isEmpty }.map { it.singleFile }.toRegular())
         constants.set(configurations.named(CONSTANTS_CONFIG).filter { !it.isEmpty }.map { it.singleFile }.toRegular())
         codebook.set(configurations.named(CODEBOOK_CONFIG).map { it.singleFile }.toRegular())
-        remapper.set(configurations.named(REMAPPER_CONFIG).map { it.singleFile }.toRegular())
+        remapper.set(configurations.named(REMAPPER_CONFIG).filter { !it.isEmpty }.map { it.singleFile }.toRegular())
         remapperArgs.set(macheConfig.map { it.remapperArgs })
         javaLauncher.set(launcher)
         minecraftVersion.set(mcVersion)
@@ -171,7 +178,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         dependsOn(vanillaDownloads, remap)
         this.lockFile.set(lockFile)
         
-        remappedJar.set(remap.flatMap(RemapTask::remappedJar))
+        remappedJar.set(remap.flatMap(CodebookTask::remappedJar))
         vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
         decompiler.set(configurations.named(DECOMPILER_CONFIG).map { it.singleFile }.toRegular())
         decompilerArgs.set(macheConfig.map { it.decompilerArgs })
@@ -286,7 +293,7 @@ private fun Project.addDependenciesToPipelineConfigs(devBundleInfo: Provider<Dev
         named(PARAM_MAPPINGS_CONFIG) {
             defaultDependencies {
                 addAllLater(macheConfig.map { mache ->
-                    mache.dependencies.paramMappings.map { deps.create(it.toDependencyString()) }
+                    mache.dependencies.paramMappings?.map { deps.create(it.toDependencyString()) } ?: emptyList()
                 })
             }
         }
@@ -300,7 +307,7 @@ private fun Project.addDependenciesToPipelineConfigs(devBundleInfo: Provider<Dev
         named(REMAPPER_CONFIG) {
             defaultDependencies {
                 addAllLater(macheConfig.map { mache ->
-                    mache.dependencies.remapper.map { deps.create(it.toDependencyString()) }
+                    mache.dependencies.remapper?.map { deps.create(it.toDependencyString()) } ?: emptyList()
                 })
             }
         }

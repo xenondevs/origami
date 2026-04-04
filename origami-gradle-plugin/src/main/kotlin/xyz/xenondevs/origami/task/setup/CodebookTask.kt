@@ -18,7 +18,7 @@ import xyz.xenondevs.origami.util.withLock
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-internal abstract class RemapTask : DefaultTask() {
+internal abstract class CodebookTask : DefaultTask() {
     
     @get:Internal
     abstract val lockFile: RegularFileProperty
@@ -33,10 +33,12 @@ internal abstract class RemapTask : DefaultTask() {
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
+    @get:Optional
     abstract val mappings: RegularFileProperty
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
+    @get:Optional
     abstract val paramMappings: RegularFileProperty
     
     @get:InputFile
@@ -50,6 +52,7 @@ internal abstract class RemapTask : DefaultTask() {
     
     @get:InputFile
     @get:PathSensitive(PathSensitivity.NONE)
+    @get:Optional
     abstract val remapper: RegularFileProperty
     
     @get:Input
@@ -65,7 +68,7 @@ internal abstract class RemapTask : DefaultTask() {
     abstract val remappedJar: RegularFileProperty
     
     init {
-        outputs.upToDateWhen { (it as RemapTask).remappedJar.get().asFile.exists() }
+        outputs.upToDateWhen { (it as CodebookTask).remappedJar.get().asFile.exists() }
     }
     
     @TaskAction
@@ -76,7 +79,7 @@ internal abstract class RemapTask : DefaultTask() {
         }
         
         val mcVersion = minecraftVersion.get()
-        logger.info("Remapping obfuscated vanilla server $mcVersion jar")
+        logger.info("Running Codebook with vanilla server $mcVersion jar")
         val tempOut = temporaryDir.resolve("vanilla-remapped-$mcVersion.jar")
         
         val libraries = vanillaLibraries.get().asFile.walkTopDown()
@@ -86,12 +89,22 @@ internal abstract class RemapTask : DefaultTask() {
         val args = remapperArgs.get().map { arg ->
             var newArg = arg
                 .replace("{tempDir}", temporaryDir.absolutePath)
-                .replace("{remapperFile}", remapper.get().asFile.absolutePath)
-                .replace("{mappingsFile}", mappings.get().asFile.absolutePath)
-                .replace("{paramsFile}", paramMappings.get().asFile.absolutePath)
                 .replace("{output}", tempOut.absolutePath)
                 .replace("{input}", vanillaServer.get().asFile.absolutePath)
                 .replace("{inputClasspath}", libraries.joinToString(":") { it.absolutePath })
+            
+            if (newArg.contains("{mappingsFile}")) {
+                check(mappings.isPresent) { "Codebook args reference {mappingsFile}, but no server mappings were downloaded" }
+                newArg = newArg.replace("{mappingsFile}", mappings.get().asFile.absolutePath)
+            }
+            if (newArg.contains("{remapperFile}")) {
+                check(remapper.isPresent) { "Codebook args reference {remapperFile}, but no remapper dependency is configured" }
+                newArg = newArg.replace("{remapperFile}", remapper.get().asFile.absolutePath)
+            }
+            if (newArg.contains("{paramsFile}")) {
+                check(paramMappings.isPresent) { "Codebook args reference {paramsFile}, but no parameter mappings dependency is configured" }
+                newArg = newArg.replace("{paramsFile}", paramMappings.get().asFile.absolutePath)
+            }
             if (constants.isPresent)
                 newArg = newArg.replace("{constantsFile}", constants.get().asFile.absolutePath)
             
@@ -108,8 +121,8 @@ internal abstract class RemapTask : DefaultTask() {
             *args.toTypedArray()
         ).directory(temporaryDir).redirectError(codebookLog).redirectOutput(codebookLog).start()
         
-        check(process.waitFor() == 0) { "Failed to remap, Codebook exited with code ${process.exitValue()}" }
-        check(tempOut.exists()) { "Failed to remap, remapped jar not found at ${tempOut.absolutePath}" }
+        check(process.waitFor() == 0) { "Failed to run Codebook, exited with code ${process.exitValue()}" }
+        check(tempOut.exists()) { "Failed to run Codebook, output jar not found at ${tempOut.absolutePath}" }
         
         remappedJar.get().asFile.parentFile.mkdirs()
         Files.move(tempOut.toPath(), remappedJar.get().asFile.toPath(), StandardCopyOption.REPLACE_EXISTING)

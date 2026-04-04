@@ -55,18 +55,19 @@ internal abstract class VanillaDownloadTask @Inject constructor(objects: ObjectF
         logger.info("Downloading vanilla server files for Minecraft version ${minecraftVersion.get()}")
         
         val serverUrl: String
-        val mappingsUrl: String
+        val mappingsUrl: String?
         run {
-            val mcVersion = minecraftVersion.get()    
+            val mcVersion = minecraftVersion.get()
             val versionUrl = downloadJson<VersionManifest>(VERSION_MANIFEST).versions.first { it.id == mcVersion }.url
             val downloads = downloadJson<VersionData>(versionUrl).downloads
             serverUrl = downloads["server"]!!.url
-            mappingsUrl = downloads["server_mappings"]!!.url
+            mappingsUrl = downloads["server_mappings"]?.url
         }
         
         val pool = AsyncUtils.createPool("vanilla-downloads", threadCount = 2)
         pool.execute { downloadServerAndLibraries(serverUrl) }
-        pool.execute { download(mappingsUrl, serverMappings.get().asFile) }
+        if (mappingsUrl != null)
+            pool.execute { download(mappingsUrl, serverMappings.get().asFile) }
         pool.shutdown()
         pool.awaitTermination(10, TimeUnit.MINUTES)
     }

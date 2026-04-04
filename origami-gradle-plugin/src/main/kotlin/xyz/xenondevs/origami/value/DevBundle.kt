@@ -32,7 +32,7 @@ class DevBundle(
     val minecraftVersion: String,
     val mache: MavenDependency,
     val patchDir: String,
-    val reobfMappingsFile: String,
+    val reobfMappingsFile: String?,
     val mojangMappedPaperclipFile: String,
     val libraryRepositories: List<String>,
     val pluginRemapArgs: List<String>,
