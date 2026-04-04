@@ -2,23 +2,23 @@
 format.version = "1.1"
 
 [versions]
-asm = "9.8"
-mixin = "0.16.3+mixin.0.8.7"
-mixinextras = "0.5.0"
+asm = "9.9.1"
 kotlin = "2.3.20"
+mixin = "0.17.1+mixin.0.8.7"
+mixinextras = "0.5.3"
 
 [libraries]
 accesswidener = { group = "net.fabricmc", name = "access-widener", version = "2.1.0" }
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
 asm-tree = { group = "org.ow2.asm", name = "asm-tree", version.ref = "asm" }
-diffpatch = { group = "io.codechicken", name = "DiffPatch", version = "2.0.1.39" }
+diffpatch = { group = "io.codechicken", name = "DiffPatch", version = "2.1.0.43" }
 javaparser = { group = "com.github.javaparser", name = "javaparser-symbol-solver-core", version = "3.27.0" }
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 kotlinx-coroutines-core-jvm = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core-jvm", version = "1.10.2" }
-gson = { group = "com.google.code.gson", name = "gson", version = "2.12.1" }
+gson = { group = "com.google.code.gson", name = "gson", version = "2.13.2" }
 mixin = { group = "net.fabricmc", name = "sponge-mixin", version.ref = "mixin" }
 mixinextras = { group = "io.github.llamalad7", name = "mixinextras-common", version.ref = "mixinextras" }
-snakeyaml = { group = "org.yaml", name = "snakeyaml", version = "2.2" }
+snakeyaml = { group = "org.yaml", name = "snakeyaml", version = "2.6" }
 
 [bundles]
 asm = ["asm", "asm-tree"]

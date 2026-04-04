@@ -7,8 +7,10 @@ import org.spongepowered.asm.launch.platform.container.IContainerHandle
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel
 import org.spongepowered.asm.mixin.MixinEnvironment.Phase
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory
+import org.spongepowered.asm.service.IAdviceProvider
 import org.spongepowered.asm.service.IClassBytecodeProvider
 import org.spongepowered.asm.service.IClassProvider
+import org.spongepowered.asm.service.IFeatureValidator
 import org.spongepowered.asm.service.IMixinInternal
 import org.spongepowered.asm.service.IMixinService
 import org.spongepowered.asm.util.Constants
@@ -77,6 +79,10 @@ class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvide
     override fun checkEnv(bootSource: Any?) = Unit
     
     override fun getAuditTrail() = null
+    
+    override fun getFeatureValidator(): IFeatureValidator = IFeatureValidator.ALLOW_ALL
+    
+    override fun getAdviceProvider(): IAdviceProvider = IAdviceProvider.GENERIC
     
     override fun getPlatformAgents() = emptyList<String>()
     
