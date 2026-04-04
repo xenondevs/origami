@@ -64,9 +64,9 @@ class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvide
     
     override fun getSideName() = Constants.SIDE_SERVER
     
-    override fun getMinCompatibilityLevel() = CompatibilityLevel.JAVA_21
+    override fun getMinCompatibilityLevel() = CompatibilityLevel.JAVA_25
     
-    override fun getMaxCompatibilityLevel() = CompatibilityLevel.JAVA_22
+    override fun getMaxCompatibilityLevel() = CompatibilityLevel.JAVA_25
     
     override fun getLogger(name: String) = MixinLoggers.getLogger(name)
     

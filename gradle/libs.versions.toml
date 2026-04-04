@@ -13,6 +13,7 @@ asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
 asm-tree = { group = "org.ow2.asm", name = "asm-tree", version.ref = "asm" }
 diffpatch = { group = "io.codechicken", name = "DiffPatch", version = "2.1.0.43" }
 javaparser = { group = "com.github.javaparser", name = "javaparser-symbol-solver-core", version = "3.27.0" }
+kotlin-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 kotlinx-coroutines-core-jvm = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core-jvm", version = "1.10.2" }
 gson = { group = "com.google.code.gson", name = "gson", version = "2.13.2" }
@@ -23,6 +24,3 @@ snakeyaml = { group = "org.yaml", name = "snakeyaml", version = "2.6" }
 [bundles]
 asm = ["asm", "asm-tree"]
 kotlin = ["kotlin-stdlib", "kotlinx-coroutines-core-jvm"]
-
-[plugins]
-kotlin = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
