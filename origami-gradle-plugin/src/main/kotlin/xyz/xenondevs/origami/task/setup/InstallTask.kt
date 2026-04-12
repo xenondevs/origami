@@ -13,11 +13,17 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.property
+import xyz.xenondevs.origami.util.asPath
+import xyz.xenondevs.origami.util.getAsPath
 import java.io.File
+import java.nio.file.Path
 import javax.inject.Inject
 import javax.xml.XMLConstants
 import javax.xml.stream.XMLOutputFactory
 import javax.xml.stream.XMLStreamWriter
+import kotlin.io.path.copyTo
+import kotlin.io.path.createDirectories
+import kotlin.io.path.outputStream
 
 internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
     
@@ -78,8 +84,8 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
             )
         
         override fun install() {
-            target.get().asFile.parentFile.mkdirs()
-            source.get().asFile.copyTo(target.get().asFile, true)
+            target.getAsPath().parent.createDirectories()
+            source.getAsPath().copyTo(target.getAsPath(), true)
         }
         
     }
@@ -102,17 +108,17 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
             )
         
         override fun install() {
-            installPom(group.get(), name.get(), version.get(), target.get().asFile, serverDependencies.get())
+            installPom(group.get(), name.get(), version.get(), target.getAsPath(), serverDependencies.get())
         }
         
         private fun installPom(
             group: String,
             name: String,
             version: String,
-            pom: File,
+            pom: Path,
             dependencies: List<String>
         ) {
-            pom.parentFile.mkdirs()
+            pom.parent.createDirectories()
             pom.outputStream().buffered().use { out ->
                 val writer = XMLOutputFactory.newInstance().createXMLStreamWriter(out)
                 

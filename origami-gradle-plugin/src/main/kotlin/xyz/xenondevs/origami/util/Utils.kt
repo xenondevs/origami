@@ -4,12 +4,15 @@ import org.gradle.StartParameter
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.ExternalModuleDependency
+import org.gradle.api.file.RegularFile
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskProvider
 import org.gradle.internal.DefaultTaskExecutionRequest
 import org.gradle.kotlin.dsl.setProperty
 import xyz.xenondevs.origami.task.setup.InstallTask
+import java.nio.file.Path
 
 internal inline fun <reified T : Any> ObjectFactory.providerSet(
     vararg providers: Provider<out T>
@@ -50,3 +53,9 @@ internal fun getIdeaSourcesDownloadTasks(project: Project, sources: InstallTask.
     
     return emptyList()
 }
+
+internal fun RegularFileProperty.getAsPath(): Path =
+    get().asFile.toPath()
+
+internal val RegularFile.asPath: Path
+    get() = asFile.toPath()
