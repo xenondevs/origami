@@ -22,15 +22,20 @@ import xyz.xenondevs.origami.transformer.runtime.MixinTransformer
 import xyz.xenondevs.origami.util.WriteOnlyArrayList
 import java.io.InputStream
 import java.net.URL
+import java.util.jar.JarFile
 
 class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvider {
     
-    val pluginsClasspath = LazyClassPath(WriteOnlyArrayList(), includeAllCode = true)
+    private val pluginsClasspath = LazyClassPath(WriteOnlyArrayList(), includeAllCode = true)
+    private val plugins = HashMap<String, JarFile>()
+    private val lock = ReEntranceLock(1)
+    private val origami = Origami.instance
+    private val container = ContainerHandleVirtual("Origami")
     
-    val lock = ReEntranceLock(1)
-    val origami = Origami.instance
-    
-    val container = ContainerHandleVirtual("Origami")
+    fun addToClasspath(id: String, plugin: JarFile) {
+        pluginsClasspath.files.add(plugin)
+        plugins[id] = plugin
+    }
     
     override fun getName(): String = "Origami"
     
@@ -51,8 +56,15 @@ class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvide
     override fun getBytecodeProvider() = this
     
     override fun getResourceAsStream(name: String): InputStream? {
-        return pluginsClasspath.findResourceStream(name)
-            ?: origami.minecraftLoader.getResourceAsStream(name)
+        if (name.contains(':')) {
+            val pluginId = name.substringBefore(':')
+            val path = name.substringAfter(':')
+            val jf = plugins[pluginId] ?: return null
+            return jf.getInputStream(jf.getJarEntry(path)).buffered()
+        } else {
+            return pluginsClasspath.findResourceStream(name)
+                ?: origami.minecraftLoader.getResourceAsStream(name)
+        }
     }
     
     override fun getTransformerProvider() = null

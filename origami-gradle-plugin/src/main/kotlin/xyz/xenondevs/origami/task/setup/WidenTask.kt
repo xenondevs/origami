@@ -58,10 +58,9 @@ import kotlin.time.measureTime
 @CacheableTask
 internal abstract class WidenTask : DefaultTask() {
     
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.NAME_ONLY)
-    @get:Optional
-    abstract val accessWidenerFile: RegularFileProperty
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val accessWideners: ConfigurableFileCollection
     
     @get:InputFiles
     @get:Classpath
@@ -99,12 +98,14 @@ internal abstract class WidenTask : DefaultTask() {
         val accessWidener = AccessWidener()
         val config = AccessWidenerConfig()
         
-        if (accessWidenerFile.isPresent) {
-            val projectAw = accessWidenerFile.asFile.get()
-            logger.info("Using project access wideners from ${projectAw.name}")
-            projectAw.bufferedReader().use { reader ->
-                val awr = AccessWidenerReader(ForwardingVisitor(config, accessWidener))
-                awr.read(reader)
+        val accessWideners = accessWideners.files
+        if (accessWideners.isNotEmpty()) {
+            for (projectAw in accessWideners) {
+                logger.info("Using project access wideners from ${projectAw.name}")
+                projectAw.bufferedReader().use { reader ->
+                    val awr = AccessWidenerReader(ForwardingVisitor(config, accessWidener))
+                    awr.read(reader)
+                }
             }
         } else {
             logger.info("No project access wideners configured")

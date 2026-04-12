@@ -22,6 +22,12 @@ import java.util.jar.JarFile
 import kotlin.io.path.Path
 import kotlin.io.path.listDirectoryEntries
 
+private data class PluginInfo(val jar: JarFile, val origamiJson: JsonObject, val paperYml: Map<String, Any>) {
+    val pluginName = paperYml["name"]?.toString()
+        ?: throw IllegalArgumentException("Plugin does not have a valid name in paper-plugin.yml")
+    val pluginId = origamiJson.getAsJsonPrimitive("pluginId")?.asString ?: pluginName
+}
+
 object PluginLoader {
     
     private data class ConfigOwner(val jar: JarFile, val id: String, val name: String)
@@ -37,8 +43,6 @@ object PluginLoader {
     @Suppress("UNCHECKED_CAST")
     suspend fun loadPlugins() = coroutineScope {
         val plugins = Path("plugins").listDirectoryEntries(glob = "*.jar")
-        
-        data class PluginInfo(val jar: JarFile, val origamiJson: JsonObject, val paperYml: Map<String, Any>)
         
         val origamiPlugins = plugins.map { path ->
             async(Dispatchers.IO) {
@@ -64,12 +68,15 @@ object PluginLoader {
             }
         }.awaitAll().filterNotNull()
         
-        (MixinService.getService() as OrigamiMixinService).pluginsClasspath.files.addAll(origamiPlugins.map { it.jar })
+        val service = MixinService.getService() as OrigamiMixinService
+        for (plugin in origamiPlugins) {
+            service.addToClasspath(plugin.pluginId, plugin.jar)
+        }
         
         origamiPlugins.map {
             async(Dispatchers.IO) {
                 try {
-                    loadPlugin(it.jar, it.origamiJson, it.paperYml)
+                    loadPlugin(it)
                 } catch (e: Exception) {
                     System.err.println("Failed to load plugin from ${it.jar.name}: ${e.message}")
                     e.printStackTrace()
@@ -107,27 +114,26 @@ object PluginLoader {
         }
     }
     
-    private suspend fun loadPlugin(jar: JarFile, origamiJson: JsonObject, paperYml: Map<String, Any>) = coroutineScope {
-        val pluginName = paperYml["name"]?.toString()
-            ?: throw IllegalArgumentException("Plugin does not have a valid name in paper-plugin.yml")
-        
-        val pluginId = origamiJson.getAsJsonPrimitive("pluginId")?.asString ?: pluginName
+    private suspend fun loadPlugin(info: PluginInfo) = coroutineScope {
         // TODO: check origami version mismatch and tell user to run the plugin with a newer version of Origami as the agent
         
-        val accessWidenerEntry = jar.getJarEntry("$pluginId.accesswidener") ?: jar.getEntry("$pluginId.aw")
-        if (accessWidenerEntry != null) {
-            synchronized(AccessTransformer) {
-                AccessTransformer.readAccessWidener(jar.getInputStream(accessWidenerEntry))
+        info.jar.entries().asSequence()
+            .filter { it.name.endsWith(".accesswidener") || it.name.endsWith(".aw") }
+            .forEach { awEntry ->
+                synchronized(AccessTransformer) {
+                    AccessTransformer.readAccessWidener(info.jar.getInputStream(awEntry))
+                }
             }
-        }
         
-        val mixinEntry = jar.getJarEntry("$pluginId.mixins.json")
-        if (mixinEntry != null) {
-            synchronized(mixinConfigs) {
-                configOwners[mixinEntry.name] = ConfigOwner(jar, pluginId, pluginName)
-                Mixins.addConfiguration(mixinEntry.name)
+        info.jar.entries().asSequence()
+            .filter { it.name.endsWith(".mixins.json") }
+            .forEach { mixinEntry ->
+                synchronized(mixinConfigs) {
+                    val cfgName = "${info.pluginId}:${mixinEntry.name}"
+                    configOwners[cfgName] = ConfigOwner(info.jar, info.pluginId, info.pluginName)
+                    Mixins.addConfiguration(cfgName)
+                }
             }
-        }
     }
     
 }

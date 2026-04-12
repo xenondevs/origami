@@ -6,6 +6,7 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
+import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Delete
@@ -14,15 +15,18 @@ import org.gradle.jvm.toolchain.JavaLauncher
 import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.maven
+import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.of
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.repositories
+import org.gradle.kotlin.dsl.withType
+import org.gradle.language.jvm.tasks.ProcessResources
 import xyz.xenondevs.origami.extension.OrigamiExtension
 import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.task.setup.ApplyPaperPatchesTask
+import xyz.xenondevs.origami.task.setup.CodebookTask
 import xyz.xenondevs.origami.task.setup.DecompileTask
 import xyz.xenondevs.origami.task.setup.InstallTask
-import xyz.xenondevs.origami.task.setup.CodebookTask
 import xyz.xenondevs.origami.task.setup.VanillaDownloadTask
 import xyz.xenondevs.origami.task.setup.WidenTask
 import xyz.xenondevs.origami.util.getIdeaSourcesDownloadTasks
@@ -87,15 +91,11 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     
     fun WidenTask.configureCommon() {
         (this as Task).configureCommon()
-        
-        accessWidenerFile.set(ext.pluginId
-            .map { id ->
-                listOf(
-                    "src/main/resources/$id.accesswidener",
-                    "src/main/resources/$id.aw"
-                ).map { layout.projectDirectory.file(it) }.firstOrNull { it.asFile.exists() }
-            }.filter { it != null }
-        )
+        val mainResources = project.extensions
+            .getByType(JavaPluginExtension::class.java)
+            .sourceSets.getByName("main")
+            .resources
+        accessWideners.from(mainResources.matching { include("**/*.accesswidener", "**/*.aw") })
         transitiveAccessWidenerSources.from(ext.transitiveAccessWidenerSources)
     }
     
