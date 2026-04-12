@@ -3,7 +3,7 @@ Origami is a mixin loader and access widener for Paper that can be used in plugi
 
 ## Limitations
 
-Since plugin and Minecraft classes are loaded by different classloaders, Mixins cannot directly reference addon classes. Origami solves this problem by replacing calls to your addon's classes with invokedynamic instructions that will then link to the correct class at runtime. Because of this, some Mixin features are currently not supported or may not work correctly. Most notably, injecting interfaces will not work.
+Since plugin- and Minecraft classes are loaded by different classloaders, Mixins cannot directly reference plugin classes. Origami solves this problem by replacing calls to your plugin's classes with invokedynamic instructions that will then link to the correct class at runtime. Because of this, some Mixin features are currently not supported or may not work correctly. Most notably, injecting interfaces will not work.
 
 ## Usage
 
@@ -113,4 +113,4 @@ origami {
 
 ### Step 5: Run server
 
-Start the server with `javaagent:plugins/<Path to your plugin>.jar` as a JVM argument.
+Start the server with `-javaagent:plugins/<Path to your plugin>.jar` as a JVM argument.
