@@ -211,12 +211,17 @@ internal abstract class WidenTask : DefaultTask() {
                 if (name.endsWith(".java")) {
                     out.putNextEntry(ZipEntry(name))
                     if (name.endsWith(".java") && aw.hasClass(name)) {
-                        val code = inp.readBytes().decodeToString()
-                        val cu = javaParser.parse(code).result
-                            .orElseThrow { IllegalStateException("Cannot parse $name") }
-                        
-                        applyAccessChanges(cu, config, parserFacade)
-                        out.write(cu.toString().toByteArray())
+                        try {
+                            val code = inp.readBytes().decodeToString()
+                            val cu = javaParser.parse(code).result
+                                .orElseThrow { IllegalStateException("Cannot parse $name") }
+                            
+                            applyAccessChanges(cu, config, parserFacade)
+                            out.write(cu.toString().toByteArray())
+                        } catch (e: Exception) {
+                            logger.error("Failed to parse $name", e)
+                            inp.copyTo(out)
+                        }
                     } else {
                         inp.copyTo(out)
                     }
