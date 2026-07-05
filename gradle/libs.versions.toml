@@ -2,17 +2,17 @@
 format.version = "1.1"
 
 [versions]
-asm = "9.9.1"
-kotlin = "2.3.20"
-mixin = "0.17.1+mixin.0.8.7"
-mixinextras = "0.5.3"
+asm = "9.10.1"
+kotlin = "2.4.0"
+mixin = "0.17.3+mixin.0.8.7"
+mixinextras = "0.5.4"
 
 [libraries]
 accesswidener = { group = "net.fabricmc", name = "access-widener", version = "2.1.0" }
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm" }
 asm-tree = { group = "org.ow2.asm", name = "asm-tree", version.ref = "asm" }
 diffpatch = { group = "io.codechicken", name = "DiffPatch", version = "2.1.0.43" }
-javaparser = { group = "com.github.javaparser", name = "javaparser-symbol-solver-core", version = "3.27.0" }
+javaparser = { group = "com.github.javaparser", name = "javaparser-symbol-solver-core", version = "3.28.2" }
 kotlin-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 kotlinx-coroutines-core-jvm = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core-jvm", version = "1.10.2" }
