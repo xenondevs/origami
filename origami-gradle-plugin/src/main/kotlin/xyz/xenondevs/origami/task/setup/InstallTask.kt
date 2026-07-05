@@ -9,6 +9,7 @@ import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.listProperty
@@ -39,17 +40,17 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
     @get:Internal
     val localRepo: DirectoryProperty = objects.directoryProperty()
     
-    // dummy output file used to create dependency of configuration artifact resolution onto install task
+    // marker output file used to create dependency of configuration artifact resolution onto install task
+    @get:Optional
     @get:OutputFile
-    val dummyFile: RegularFileProperty = objects.fileProperty()
-        .convention(localRepo.file("~origami"))
+    abstract val markerFile: RegularFileProperty
     
     @get:OutputFile
     abstract val target: RegularFileProperty
     
     @TaskAction
     fun run() {
-        dummyFile.get().asFile.createNewFile()
+        markerFile.orNull?.asFile?.createNewFile()
         install()
     }
     

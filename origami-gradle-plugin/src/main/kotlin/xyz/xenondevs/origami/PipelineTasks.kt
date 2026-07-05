@@ -149,6 +149,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         configureCommon()
         dependsOn(installPom)
         source.set(widenJar.flatMap(WidenTask::output))
+        markerFile.set(localRepo.file("~origami"))
     }
     //</editor-fold>
     
@@ -246,7 +247,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
         
         for (targetCfg in ext.targetConfigurations.get()) {
             targetCfg.withDependencies {
-                add(dependencyFactory.create(files(installJar.flatMap { it.dummyFile })))
+                add(dependencyFactory.create(files(installJar.flatMap { it.markerFile })))
                 addLater(installJar.flatMap {
                     it.name.zip(it.version) { artifact, version ->
                         dependencyFactory.create("xyz.xenondevs.origami.patched-server:$artifact:$version")
