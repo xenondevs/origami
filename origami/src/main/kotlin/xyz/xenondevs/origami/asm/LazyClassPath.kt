@@ -55,7 +55,6 @@ class LazyClassPath(val files: WriteOnlyArrayList<JarFile>, private val includeA
         
         if (stream == null) {
             val resource = ClassLoader.getSystemClassLoader().parent.getResource(entryName)
-                ?: javaClass.classLoader.getResource(entryName)
             stream = resource?.openStream()?.buffered()
         }
         

@@ -232,7 +232,10 @@ object DynamicInvoker {
     }
     
     private fun isPluginClass(internalName: String, currentClass: String): Boolean {
-        return minecraftClassPath.getClass(internalName) == null && internalName != currentClass
+        return internalName != currentClass
+            && !internalName.startsWith("org/spongepowered/asm/mixin")
+            && !internalName.startsWith("com/llamalad7/mixinextras")
+            && minecraftClassPath.getClass(internalName) == null
     }
     
     private fun fixType(type: Type, currentClass: String): Type {
