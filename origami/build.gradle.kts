@@ -4,12 +4,10 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.accesswidener)
-    implementation(libs.mixin)
-    implementation(libs.mixinextras)
-    implementation(libs.snakeyaml)
-    implementation(libs.gson)
-    implementation(libs.bundles.asm)
-    implementation(libs.bundles.kotlin)
-    compileOnly(project(":origami-loader"))
+    api(libs.kotlin.stdlib)
+    api(libs.accesswidener)
+    api(libs.mixin)
+    api(libs.mixinextras)
+    api(libs.snakeyaml)
+    api(libs.bundles.asm)
 }

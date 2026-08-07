@@ -11,7 +11,10 @@ import java.util.jar.JarFile
  * A virtual class path with lazy lookups mostly used for inheritance to support [PatchClassWriter.getCommonSuperClass]
  * without actually loading classes.
  */
-class LazyClassPath(val files: WriteOnlyArrayList<JarFile>, private val includeAllCode: Boolean = false) {
+class LazyClassPath(
+    val files: WriteOnlyArrayList<JarFile> = WriteOnlyArrayList(),
+    private val includeAllCode: Boolean = false
+) {
     
     /**
      * A list of classes whose instructions should not be skipped because of patching purposes

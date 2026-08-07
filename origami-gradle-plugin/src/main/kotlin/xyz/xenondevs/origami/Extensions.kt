@@ -13,4 +13,5 @@ internal fun Project.registerExtensions() {
     }
     dependencies.addProvider(DEV_BUNDLE_CONFIG, devBundleNotation)
     dependencies.addProvider(DEV_BUNDLE_COMPILE_CLASSPATH, devBundleNotation)
+    dependencies.addProvider(DEV_BUNDLE_RUNTIME_CLASSPATH, devBundleNotation)
 }

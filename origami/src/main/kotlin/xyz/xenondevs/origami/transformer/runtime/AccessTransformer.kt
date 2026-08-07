@@ -2,29 +2,20 @@ package xyz.xenondevs.origami.transformer.runtime
 
 import net.fabricmc.accesswidener.AccessWidener
 import net.fabricmc.accesswidener.AccessWidenerClassVisitor
-import net.fabricmc.accesswidener.AccessWidenerReader
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.tree.ClassNode
-import java.io.InputStream
 
-object AccessTransformer : Transformer {
-    
-    val accessWidener = AccessWidener()
-    
-    fun readAccessWidener(stream: InputStream) {
-        val reader = stream.bufferedReader()
-        reader.use(AccessWidenerReader(accessWidener)::read)
-    }
+class AccessTransformer(private val aw: AccessWidener) : Transformer {
     
     override fun getTargetClasses(): Set<String> {
-        return accessWidener.targets.mapTo(HashSet()) { it.replace('.', '/')  }
+        return aw.targets.mapTo(HashSet()) { it.replace('.', '/')  }
     }
     
-    override fun transform(clazz: ClassNode, original: ByteArray): ClassNode? {
+    override fun transform(clazz: ClassNode, original: ByteArray): ClassNode {
         val new = ClassNode()
-        val widener = AccessWidenerClassVisitor.createClassVisitor(Opcodes.ASM9, new, accessWidener)
+        val widener = AccessWidenerClassVisitor.createClassVisitor(Opcodes.ASM9, new, aw)
         clazz.accept(widener)
-        
         return new
     }
+    
 }

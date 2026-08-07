@@ -4,31 +4,26 @@ import org.objectweb.asm.ClassReader
 import org.objectweb.asm.tree.ClassNode
 import org.spongepowered.asm.mixin.MixinEnvironment
 import xyz.xenondevs.origami.asm.PatchClassWriter
-import java.util.concurrent.ConcurrentHashMap
 
-object TransformerRegistry {
+class TransformerRegistry(transformers: List<Transformer>) {
     
-    private val transformers = listOf(MixinTransformer, AccessTransformer)
-    private val toTransform = ConcurrentHashMap<String, MutableList<Transformer>>()
-    
-    fun init() {
-        transformers.forEach { transformer ->
-            transformer.getTargetClasses().forEach { clazz ->
-                toTransform.computeIfAbsent(clazz.replace('.', '/')) { ArrayList() }.add(transformer)
+    val targetClasses: Map<String, List<Transformer>> = buildMap<String, MutableList<Transformer>> {
+        for (transformer in transformers) {
+            for (targetClass in transformer.getTargetClasses()) {
+                getOrPut(targetClass.replace('.', '/'), ::ArrayList) += transformer
             }
         }
     }
     
-    @JvmStatic
     fun transform(bytecode: ByteArray, name: String): ByteArray {
-        if (toTransform.isEmpty())
+        if (targetClasses.isEmpty())
             return bytecode
         
-        val classTransformers = toTransform.get(name) ?: return bytecode
-        return transformUnchecked(bytecode, name, classTransformers)
+        val classTransformers = targetClasses[name] ?: return bytecode
+        return runTransformers(bytecode, name, classTransformers)
     }
     
-    private fun transformUnchecked(bytecode: ByteArray, name: String, transformers: List<Transformer> = TransformerRegistry.transformers): ByteArray {
+    private fun runTransformers(bytecode: ByteArray, name: String, transformers: List<Transformer>): ByteArray {
         var clazz = ClassNode()
         
         if (bytecode.isNotEmpty()) {

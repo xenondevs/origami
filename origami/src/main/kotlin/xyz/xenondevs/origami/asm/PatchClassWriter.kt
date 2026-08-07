@@ -2,14 +2,17 @@ package xyz.xenondevs.origami.asm
 
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.tree.ClassNode
-import xyz.xenondevs.origami.Origami
+import xyz.xenondevs.origami.OrigamiEnvironment
 import xyz.xenondevs.origami.util.isInterface
 
 private const val OBJECT_INTERNAL = "java/lang/Object"
 
 class PatchClassWriter(val classPath: LazyClassPath, flags: Int = COMPUTE_FRAMES) : ClassWriter(flags) {
     
-    constructor(flags: Int = COMPUTE_FRAMES) : this(Origami.instance.minecraftClasspath, flags)
+    constructor(flags: Int = COMPUTE_FRAMES) : this(
+        checkNotNull(OrigamiEnvironment.minecraftClasspath) { "mc classpath not available yet" },
+        flags
+    )
     
     override fun getCommonSuperClass(type1: String, type2: String): String {
         if (OBJECT_INTERNAL == type1 || OBJECT_INTERNAL == type2)

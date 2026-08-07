@@ -28,7 +28,7 @@ data class MavenRepo(
     val groups: List<String>
 )
 
-class DevBundle(
+data class DevBundle(
     val minecraftVersion: String,
     val mache: MavenDependency,
     val patchDir: String,

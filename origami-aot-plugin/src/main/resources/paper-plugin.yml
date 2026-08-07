@@ -1,0 +1,4 @@
+name: origami-aot-cache
+version: 0
+main: xyz.xenondevs.origami.mixin.AotCachePlugin
+api-version: 26.2

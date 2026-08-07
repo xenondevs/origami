@@ -11,14 +11,20 @@ import javax.inject.Inject
 
 internal const val DEV_BUNDLE_CONFIG = "paperweightDevelopmentBundle"
 internal const val DEV_BUNDLE_COMPILE_CLASSPATH = "paperweightDevelopmentBundleCompileClasspath"
+internal const val DEV_BUNDLE_RUNTIME_CLASSPATH = "paperweightDevelopmentBundleRuntimeClasspath"
 internal const val MACHE_CONFIG = "macheConfig"
 internal const val CODEBOOK_CONFIG = "codebookConfig"
 internal const val PARAM_MAPPINGS_CONFIG = "paramMappingsConfig"
 internal const val CONSTANTS_CONFIG = "constantsConfig"
 internal const val REMAPPER_CONFIG = "remapperConfig"
 internal const val DECOMPILER_CONFIG = "decompilerConfig"
-internal const val ORIGAMI_CONFIG = "origamiConfig"
-internal const val ORIGAMI_LOADER_CONFIG = "origamiLoaderConfig"
+
+internal const val ORIGAMI_JIT_CONFIG = "origamiJitConfig"
+internal const val ORIGAMI_JIT_INJECTABLES_CONFIG = "origamiJitInjectablesConfig"
+internal const val ORIGAMI_JIT_LOADER_CONFIG = "origamiJitLoaderConfig"
+internal const val ORIGAMI_AOT_PATCHER_CONFIG = "origamiAotPatcherConfig"
+internal const val ORIGAMI_AOT_INJECTABLES_CONFIG = "origamiAotInjectablesConfig"
+internal const val ORIGAMI_AOT_PLUGIN_CONFIG = "origamiAotPluginConfig"
 
 internal const val ORIGAMI_TASK_GROUP = "origami"
 internal const val ORIGAMI_EXTENSION = "origami"
@@ -39,7 +45,7 @@ abstract class OrigamiPlugin : Plugin<Project> {
         
         target.registerTasks(this)
         target.registerPackagingTasks()
-        target.registerPackagingExtensions()
+        target.registerRunTasks(this)
     }
     
     companion object {

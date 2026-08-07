@@ -1,3 +1,5 @@
+import xyz.xenondevs.origami.task.GenerateVersionFile
+
 plugins {
     `kotlin-dsl`
     id("origami.kotlin-conventions")
@@ -5,11 +7,25 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":origami"))
     implementation(libs.gson)
+    implementation(libs.commons.gson)
     implementation(libs.accesswidener)
     implementation(libs.diffpatch)
     implementation(libs.asm)
     implementation(libs.javaparser)
+    testImplementation(gradleTestKit())
+    testImplementation(kotlin("test"))
+}
+
+java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+
+tasks.test {
+    useJUnitPlatform()
+}
+
+tasks.named("check") {
+    dependsOn(tasks.named("validatePlugins"))
 }
 
 gradlePlugin {
@@ -22,17 +38,15 @@ gradlePlugin {
     }
 }
 
-tasks.register("generateVersionFile") {
-    val versionFile = layout.buildDirectory.file("generatedResources/xyz.xenondevs.origami.version").get().asFile
-    inputs.property("projectVersion", project.version.toString())
-    outputs.file(versionFile)
-    
-    doLast {
-        versionFile.parentFile.mkdirs()
-        versionFile.writeText(project.version.toString())
-    }
+tasks.register<GenerateVersionFile>("generateVersionFile") {
+    versionText.set(version.toString())
+    outputFile.set(layout.buildDirectory.file("generatedResources/xyz.xenondevs.origami.version"))
 }
 
 tasks.named<ProcessResources>("processResources") {
     from(tasks.named("generateVersionFile"))
+    from(project(":origami-aot-plugin").tasks.named<Jar>("jar").flatMap { it.archiveFile }) {
+        into("xyz/xenondevs/origami")
+        rename { "aot-helper.jar" }
+    }
 }

@@ -15,37 +15,22 @@ import org.spongepowered.asm.service.IMixinInternal
 import org.spongepowered.asm.service.IMixinService
 import org.spongepowered.asm.util.Constants
 import org.spongepowered.asm.util.ReEntranceLock
-import xyz.xenondevs.origami.Origami
-import xyz.xenondevs.origami.PluginLoader
-import xyz.xenondevs.origami.asm.LazyClassPath
-import xyz.xenondevs.origami.transformer.runtime.MixinTransformer
-import xyz.xenondevs.origami.util.WriteOnlyArrayList
+import xyz.xenondevs.origami.OrigamiEnvironment
 import java.io.InputStream
 import java.net.URL
-import java.util.jar.JarFile
 
 class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvider {
     
-    private val pluginsClasspath = LazyClassPath(WriteOnlyArrayList(), includeAllCode = true)
-    private val plugins = HashMap<String, JarFile>()
     private val lock = ReEntranceLock(1)
-    private val origami = Origami.instance
     private val container = ContainerHandleVirtual("Origami")
     
-    fun addToClasspath(id: String, plugin: JarFile) {
-        pluginsClasspath.files.add(plugin)
-        plugins[id] = plugin
-    }
-    
     override fun getName(): String = "Origami"
-    
     override fun isValid() = true
-    
     override fun getInitialPhase(): Phase = Phase.PREINIT
     
     override fun offer(internal: IMixinInternal) {
         if (internal is IMixinTransformerFactory) {
-            MixinTransformer.offer(internal)
+            OrigamiEnvironment.offer(internal)
         }
     }
     
@@ -56,14 +41,15 @@ class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvide
     override fun getBytecodeProvider() = this
     
     override fun getResourceAsStream(name: String): InputStream? {
+        val pl = OrigamiEnvironment.pluginLoader
         if (name.contains(':')) {
             val pluginId = name.substringBefore(':')
             val path = name.substringAfter(':')
-            val jf = plugins[pluginId] ?: return null
+            val jf = pl?.pluginJars[pluginId] ?: return null
             return jf.getInputStream(jf.getJarEntry(path)).buffered()
         } else {
-            return pluginsClasspath.findResourceStream(name)
-                ?: origami.minecraftLoader.getResourceAsStream(name)
+            return pl?.pluginClasspath?.findResourceStream(name)
+                ?: OrigamiEnvironment.getMinecraftResourceAsStream(name)
         }
     }
     
@@ -80,7 +66,7 @@ class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvide
     
     override fun getMaxCompatibilityLevel() = CompatibilityLevel.JAVA_25
     
-    override fun getLogger(name: String) = MixinLoggers.getLogger(name)
+    override fun getLogger(name: String) = OrigamiEnvironment.getLogger(name)
     
     override fun prepare() = Unit
     
@@ -110,7 +96,7 @@ class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvide
     }
     
     override fun findClass(name: String, initialize: Boolean): Class<*> {
-        return Class.forName(name, initialize, origami.javaClass.classLoader)
+        return Class.forName(name, initialize, OrigamiEnvironment.origamiClassLoader)
     }
     
     override fun findAgentClass(name: String, initialize: Boolean): Class<*>? {
@@ -132,21 +118,20 @@ class OrigamiMixinService : IMixinService, IClassProvider, IClassBytecodeProvide
         
         val internal = name.replace('.', '/')
         
-        val transformed = origami.minecraftLoader.getTransformedData(internal, false)
+        val transformed = OrigamiEnvironment.getTransformedBytecode(internal)
         if (transformed != null) { // TODO cache
             val node = ClassNode()
-            val reader = ClassReader(transformed.bytecode())
+            val reader = ClassReader(transformed)
             reader.accept(node, readerFlags)
             return node
         }
         
-        val mixinClazz = PluginLoader.mixinClasses[internal]
-        if (mixinClazz != null)
-            return mixinClazz
+        val mixinClass = OrigamiEnvironment.pluginLoader?.mixinClasses?.get(internal)
+        if (mixinClass != null)
+            return mixinClass
         
         // TODO: leave this out?
-        return pluginsClasspath.getClass(internal)
+        return OrigamiEnvironment.pluginLoader?.pluginClasspath?.getClass(internal)
     }
-    
     
 }

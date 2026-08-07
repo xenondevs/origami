@@ -12,34 +12,23 @@ import org.objectweb.asm.tree.LdcInsnNode
 import org.objectweb.asm.tree.MethodInsnNode
 import org.objectweb.asm.tree.MultiANewArrayInsnNode
 import org.objectweb.asm.tree.TypeInsnNode
-import xyz.xenondevs.origami.Origami
-import xyz.xenondevs.origami.PluginProxy
-import xyz.xenondevs.origami.PluginProxy.HandleType
-import xyz.xenondevs.origami.util.internalName
+import xyz.xenondevs.origami.OrigamiEnvironment
 
 private typealias InsnIterator = MutableListIterator<AbstractInsnNode>
 
+private val OBJECT_TYPE: Type = Type.getType(Object::class.java)
+private val CLASS_TYPE: Type = Type.getType(Class::class.java)
+private const val PLUGIN_PROXY_NAME = "xyz/xenondevs/origami/PluginProxy"
+private val METHOD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMethod", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
+private val CONSTRUCTOR_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyConstructor", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+private val FIELD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyField", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
+private val METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
+private val SWITCH_BOOTSTRAPS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxySwitch", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+private val INSTANCE_OF_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyInstanceOf", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+private val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyClass", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+
 // TODO: Referencing other plugins from within mixins
 object DynamicInvoker {
-    
-    val minecraftClassPath
-        get() = Origami.instance.minecraftClasspath
-    
-    val PLUGIN_PROXY_NAME = PluginProxy::class.internalName
-    
-    val METHOD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMethod", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
-    
-    val CONSTRUCTOR_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyConstructor", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
-    
-    val FIELD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyField", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
-    
-    val METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
-    
-    val SWITCH_BOOTSTRAPS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxySwitch", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
-    
-    val INSTANCE_OF_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyInstanceOf", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
-    
-    val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyClass", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
     
     fun transform(clazz: ClassNode, pluginName: String) {
         val currentMixin = clazz.name
@@ -117,7 +106,6 @@ object DynamicInvoker {
                 val newDesc = Type.getMethodDescriptor(returnType, *argumentTypes.toTypedArray())
                 val isStatic = insn.opcode == Opcodes.INVOKESTATIC
                 iter.set(InvokeDynamicInsnNode(name, newDesc, METHOD_PROXY_HANDLE, pluginName, owner, desc, if (isStatic) 1 else 0))
-                PluginProxy.addRequiredHandle(pluginName, owner, if (isStatic) HandleType.STATIC_METHOD else HandleType.VIRTUAL_METHOD, name, desc)
             }
             
             Opcodes.INVOKESPECIAL -> {
@@ -127,7 +115,6 @@ object DynamicInvoker {
                 val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it, currentClass) }
                 val newDesc = Type.getMethodDescriptor(OBJECT_TYPE, *argumentTypes.toTypedArray())
                 iter.set(InvokeDynamicInsnNode("ctor" + desc.hashCode().toString(), newDesc, CONSTRUCTOR_PROXY_HANDLE, pluginName, owner, desc))
-                PluginProxy.addRequiredHandle(pluginName, owner, HandleType.CONSTRUCTOR, name, desc)
             }
             
             else -> throw IllegalStateException("Unexpected method insn opcode ${insn.opcode}")
@@ -155,7 +142,6 @@ object DynamicInvoker {
         }
         
         iter.set(InvokeDynamicInsnNode(insn.name, newDesc, FIELD_PROXY_HANDLE, pluginName, insn.owner, insn.desc, insn.opcode))
-        PluginProxy.addRequiredHandle(pluginName, insn.owner, HandleType.fromFieldOpcode(insn.opcode), insn.name, insn.desc)
     }
     
     fun visitMultiANewArrayInsn(insn: MultiANewArrayInsnNode, currentClass: String) {
@@ -182,11 +168,13 @@ object DynamicInvoker {
                 insn.bsmArgs[2] = Type.getType(fixDesc(originalDynamicDesc, currentClass))
             } else if (isPluginClass(targetMethod.owner, currentClass)) {
                 val interfaceType = insn.bsmArgs[0] as Type
+                val originalDynamicDesc = (insn.bsmArgs[2] as Type).descriptor
                 iter.set(InvokeDynamicInsnNode(
                     insn.name,
                     fixDesc(insn.desc, currentClass),
                     METAFACTORY_PROXY_HANDLE,
                     pluginName,
+                    insn.desc,
                     interfaceType,
                     targetMethod.owner,
                     targetMethod.name,
@@ -194,7 +182,6 @@ object DynamicInvoker {
                     originalDynamicDesc,
                     targetMethod.tag
                 ))
-                PluginProxy.addRequiredHandle(pluginName, targetMethod.owner, HandleType.fromTag(targetMethod.tag), targetMethod.name, targetMethod.desc)
             }
         } else if (handle.owner == "java/lang/runtime/SwitchBootstraps") {
             if (handle.name == "typeSwitch") {
@@ -232,10 +219,10 @@ object DynamicInvoker {
     }
     
     private fun isPluginClass(internalName: String, currentClass: String): Boolean {
-        return internalName != currentClass
+        return !internalName.startsWith(currentClass) // not current class and not inner class
             && !internalName.startsWith("org/spongepowered/asm/mixin")
             && !internalName.startsWith("com/llamalad7/mixinextras")
-            && minecraftClassPath.getClass(internalName) == null
+            && OrigamiEnvironment.minecraftClasspath?.getClass(internalName) == null
     }
     
     private fun fixType(type: Type, currentClass: String): Type {
@@ -267,6 +254,3 @@ object DynamicInvoker {
     }
     
 }
-
-val OBJECT_TYPE: Type = Type.getType(Object::class.java)
-val CLASS_TYPE: Type = Type.getType(Class::class.java)

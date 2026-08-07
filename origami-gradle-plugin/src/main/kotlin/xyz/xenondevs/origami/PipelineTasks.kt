@@ -6,7 +6,6 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
-import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Delete
@@ -15,12 +14,9 @@ import org.gradle.jvm.toolchain.JavaLauncher
 import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.maven
-import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.of
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.repositories
-import org.gradle.kotlin.dsl.withType
-import org.gradle.language.jvm.tasks.ProcessResources
 import xyz.xenondevs.origami.extension.OrigamiExtension
 import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.task.setup.ApplyPaperPatchesTask
@@ -39,7 +35,7 @@ import xyz.xenondevs.origami.value.MacheConfig
 import xyz.xenondevs.origami.value.MacheConfigValueSource
 import java.io.File
 
-fun Project.registerTasks(plugin: OrigamiPlugin) {
+internal fun Project.registerTasks(plugin: OrigamiPlugin) {
     fun Provider<File>.toRegular() = layout.file(this)
     
     val ext: OrigamiExtension = this.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)
@@ -47,7 +43,8 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     val macheZip: Provider<RegularFile> = configurations.named(MACHE_CONFIG).map { it.singleFile }.toRegular()
     val devBundleInfo: Provider<DevBundle> = providers.of(DevBundleValueSource::class) { parameters.zip.set(bundleZip) }
     val devBundleHash: Provider<String> = providers.of(DevBundleHashSource::class) { parameters.zip.set(bundleZip) }
-    val macheConfig: Provider<MacheConfig> = providers.of(MacheConfigValueSource::class) { parameters.zip.set(macheZip) }
+    val macheConfig: Provider<MacheConfig> =
+        providers.of(MacheConfigValueSource::class) { parameters.zip.set(macheZip) }
     val mcVersion: Provider<String> = devBundleInfo.map(DevBundle::minecraftVersion)
     val sharedWorkDir: Provider<Directory> = ext.sharedCache.zip(devBundleHash) { cache, hash -> cache.dir(hash) }
     val lockFile: Provider<RegularFile> = sharedWorkDir.map { it.file(".lock") }
@@ -75,7 +72,6 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     }
     
     fun Task.configureCommon() {
-        group = ORIGAMI_TASK_GROUP
         onlyIf { hasDevBundle.get() }
         mustRunAfter(clean) // prevent clean from running after ori setup
     }
@@ -146,6 +142,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     }
     
     val installJar = tasks.register<InstallTask.Artifact>("_oriInstallJar") {
+        (this as Task).group = ORIGAMI_TASK_GROUP
         configureCommon()
         dependsOn(installPom)
         source.set(widenJar.flatMap(WidenTask::output))
@@ -218,6 +215,8 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     }
     
     val installSourcesJar = tasks.register<InstallTask.Artifact>("_oriInstallSourcesJar") {
+        (this as Task).group = ORIGAMI_TASK_GROUP
+        group.set(ORIGAMI_TASK_GROUP)
         configureCommon()
         dependsOn(installPom)
         classifier.set("sources")
@@ -226,6 +225,7 @@ fun Project.registerTasks(plugin: OrigamiPlugin) {
     //</editor-fold>
     
     tasks.register("_oriInstall") {
+        group = ORIGAMI_TASK_GROUP
         configureCommon()
         dependsOn(installJar, installSourcesJar)
     }
