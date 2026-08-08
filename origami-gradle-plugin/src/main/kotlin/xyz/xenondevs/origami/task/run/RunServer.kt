@@ -66,8 +66,8 @@ internal abstract class RunServer : JavaExec() {
             } else {
                 logger.lifecycle("Recording AOT cache")
                 jvmArgs(
-                    "-XX:AOTMode=record",
-                    "-XX:AOTConfiguration=${aotCacheFile.absolutePathString()}.config"
+                    "-XX:+AOTStreamableObjects",
+                    "-XX:AOTCacheOutput=${aotCacheFile.absolutePathString()}.tmp"
                 )
             }
         }
