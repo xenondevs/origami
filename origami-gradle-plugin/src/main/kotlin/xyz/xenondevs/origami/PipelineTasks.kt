@@ -9,9 +9,6 @@ import org.gradle.api.file.RegularFile
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Delete
-import org.gradle.jvm.toolchain.JavaLanguageVersion
-import org.gradle.jvm.toolchain.JavaLauncher
-import org.gradle.kotlin.dsl.findByType
 import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.maven
 import org.gradle.kotlin.dsl.of
@@ -48,10 +45,7 @@ internal fun Project.registerTasks(plugin: OrigamiPlugin) {
     val mcVersion: Provider<String> = devBundleInfo.map(DevBundle::minecraftVersion)
     val sharedWorkDir: Provider<Directory> = ext.sharedCache.zip(devBundleHash) { cache, hash -> cache.dir(hash) }
     val lockFile: Provider<RegularFile> = sharedWorkDir.map { it.file(".lock") }
-    val launcher: Provider<JavaLauncher> = extensions.findByType<JavaPluginExtension>()
-        ?.toolchain
-        ?.let(plugin.javaToolchainService::launcherFor)
-        ?: plugin.javaToolchainService.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+    val launcher = plugin.javaLauncherFor(project)
     
     @Suppress("ReplaceSizeCheckWithIsNotEmpty") // broken for DependencySet
     val hasDevBundle: Provider<Boolean> = configurations.named(DEV_BUNDLE_CONFIG).map { it.allDependencies.size != 0 }

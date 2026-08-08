@@ -1,7 +1,6 @@
 package xyz.xenondevs.origami
 
 import org.gradle.api.Project
-import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.kotlin.dsl.getByName
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.newInstance
@@ -25,8 +24,8 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
     
     val patchRunServerJar = tasks.register<PatchRunServerJar>("_oriMixin") {
         dependsOn(applyBinDiff)
-        
-        javaLauncher.set(plugin.javaToolchainService.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) })
+
+        javaLauncher.set(plugin.javaLauncherFor(project))
         setClasspath(configurations.getByName(ORIGAMI_AOT_PATCHER_CONFIG))
         
         serverJar.set(applyBinDiff.flatMap(ApplyBinDiffTask::patchedJar))
@@ -37,9 +36,7 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
         serverClasspath.from(configurations.named(ORIGAMI_AOT_INJECTABLES_CONFIG))
     }
     
-    val serverLauncher = ext.javaLauncher.orElse(
-        plugin.javaToolchainService.launcherFor { languageVersion.set(JavaLanguageVersion.of(26)) }
-    )
+    val serverLauncher = ext.javaLauncher.orElse(plugin.javaLauncherFor(26))
     
     val serverWorkingDirectory = ext.workingDirectory.orElse(project.layout.buildDirectory.dir("origami/server"))
     val serverMainClass = ext.mainClass.orElse("org.bukkit.craftbukkit.Main")
