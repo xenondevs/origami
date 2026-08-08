@@ -8,7 +8,7 @@ import org.gradle.kotlin.dsl.newInstance
 import org.gradle.kotlin.dsl.register
 import xyz.xenondevs.origami.extension.OrigamiExtension
 import xyz.xenondevs.origami.task.run.ExtractPatchInputs
-import xyz.xenondevs.origami.task.run.InvalidateAotCache
+import xyz.xenondevs.origami.task.run.GenerateAotCacheFingerprint
 import xyz.xenondevs.origami.task.run.PatchRunServerJar
 import xyz.xenondevs.origami.task.run.RunServer
 import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
@@ -41,11 +41,14 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
         plugin.javaToolchainService.launcherFor { languageVersion.set(JavaLanguageVersion.of(26)) }
     )
     
+    val serverWorkingDirectory = ext.workingDirectory.orElse(project.layout.buildDirectory.dir("origami/server"))
+    val serverMainClass = ext.mainClass.orElse("org.bukkit.craftbukkit.Main")
+    
     fun RunServer.configure() {
         group = ORIGAMI_TASK_GROUP
         
         javaLauncher.set(ext.javaLauncher.orElse(serverLauncher))
-        workingDir(ext.workingDirectory.orElse(project.layout.buildDirectory.dir("origami/server")))
+        workingDir(serverWorkingDirectory)
         jvmArguments.addAll(ext.jvmArgs)
         argumentProviders.add(objects.newInstance<ListArgumentProvider>().apply { args.set(ext.args) })
         args("--nogui")
@@ -56,7 +59,7 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
         classpath(configurations.named(ORIGAMI_AOT_INJECTABLES_CONFIG))
         classpath(ext.classpath)
         
-        mainClass.set(ext.mainClass.orElse("org.bukkit.craftbukkit.Main"))
+        mainClass.set(serverMainClass)
         
         plugins.from(configurations.named(ORIGAMI_AOT_PLUGIN_CONFIG))
         plugins.from(ext.plugins)
@@ -67,18 +70,26 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
         configure()
     }
     
-    val invalidateAotCache = tasks.register<InvalidateAotCache>("_oriCheckAotCache") {
+    val generateAotCacheFingerprint = tasks.register<GenerateAotCacheFingerprint>("_oriGenerateAotCacheFingerprint") {
         patchFingerprint.set(extractPatchInputs.flatMap { it.outputDir })
         classpath.from(patchRunServerJar.flatMap { it.outputJar })
         classpath.from(configurations.named(DEV_BUNDLE_RUNTIME_CLASSPATH))
         classpath.from(configurations.named(ORIGAMI_AOT_INJECTABLES_CONFIG))
         classpath.from(ext.classpath)
-        marker.set(projectLayout.buildDirectory.file("origami/aot-invalidation-marker"))
+        plugins.from(configurations.named(ORIGAMI_AOT_PLUGIN_CONFIG))
+        plugins.from(ext.plugins)
+        javaReleaseFile.set(serverLauncher.map { it.metadata.installationPath.file("release") })
+        jvmArgs.set(ext.jvmArgs)
+        args.set(ext.args)
+        args.add("--nogui")
+        mainClass.set(serverMainClass)
+        workingDirectory.set(serverWorkingDirectory.map { it.asFile.absolutePath })
+        outputFile.set(project.layout.buildDirectory.file("origami/aot-cache-fingerprint"))
     }
     
     tasks.register<RunServer>("runOrigamiServerAot") {
         useAotCache = true
-        dependsOn(invalidateAotCache)
+        aotCacheFingerprint.set(generateAotCacheFingerprint.flatMap { it.outputFile })
         configure()
     }
     

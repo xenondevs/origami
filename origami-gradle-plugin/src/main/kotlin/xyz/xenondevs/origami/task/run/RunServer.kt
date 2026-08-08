@@ -2,10 +2,14 @@ package xyz.xenondevs.origami.task.run
 
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.ProjectLayout
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 import java.net.URI
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
 import java.util.jar.Attributes
@@ -27,6 +31,11 @@ internal abstract class RunServer : JavaExec() {
     @get:Internal
     abstract val plugins: ConfigurableFileCollection
     
+    @get:InputFile
+    @get:Optional
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val aotCacheFingerprint: RegularFileProperty
+    
     @get:Inject
     abstract val projectLayout: ProjectLayout
     
@@ -39,9 +48,9 @@ internal abstract class RunServer : JavaExec() {
             args("--add-plugin", plugin.absolutePath)
         }
         
-        val aotCacheFile = cacheDir.resolve("server.aot")
-        
         if (useAotCache) {
+            val fingerprint = aotCacheFingerprint.get().asFile.readText().trim()
+            val aotCacheFile = cacheDir.resolve("server-$fingerprint.aot")
             val classpathJar = generateRelativeClasspathJar(cacheDir)
             setClasspath(projectLayout.files(classpathJar.toFile()))
             
