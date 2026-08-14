@@ -99,12 +99,13 @@ public class OrigamiAgent {
      *
      * @param urls        The URLs in the class loader.
      * @param classLoader The PatchingClassLoader.
+     * @param args        The Paperclip main method arguments.
      */
     @SuppressWarnings("unused")
-    public static void initOrigami(URL[] urls, ClassLoader classLoader) {
+    public static void initOrigami(URL[] urls, ClassLoader classLoader, String[] args) {
         try {
-            origamiJit.getMethod("init", URL[].class, ClassLoader.class)
-                .invoke(null, (Object) urls, classLoader);
+            origamiJit.getMethod("init", URL[].class, ClassLoader.class, String[].class)
+                .invoke(null, (Object) urls, classLoader, (Object) args);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to initialize Origami", e);
         }

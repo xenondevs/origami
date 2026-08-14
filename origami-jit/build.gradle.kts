@@ -5,5 +5,6 @@ plugins {
 
 dependencies {
     implementation(project(":origami"))
+    implementation(libs.joptsimple)
     compileOnly(project(":origami-jit-loader"))
 }

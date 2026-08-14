@@ -59,7 +59,8 @@ object PaperclipPatcher {
                         mainInsns.insert(insn.next, buildInsnList {
                             aLoad(1)
                             aLoad(3)
-                            invokeStatic("xyz/xenondevs/origami/OrigamiAgent", "initOrigami", "([Ljava/net/URL;Ljava/lang/ClassLoader;)V")
+                            aLoad(0)
+                            invokeStatic("xyz/xenondevs/origami/OrigamiAgent", "initOrigami", "([Ljava/net/URL;Ljava/lang/ClassLoader;[Ljava/lang/String;)V")
                         })
                     }
                 }

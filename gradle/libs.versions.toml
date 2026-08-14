@@ -7,6 +7,7 @@ kotlin = "2.4.10"
 mixin = "0.17.3+mixin.0.8.7"
 mixinextras = "0.5.4"
 jspecify = "1.0.0"
+joptsimple = "5.0.4"
 slf4j = "2.0.17"
 commons = "1.37"
 
@@ -17,6 +18,7 @@ asm-tree = { group = "org.ow2.asm", name = "asm-tree", version.ref = "asm" }
 diffpatch = { group = "io.codechicken", name = "DiffPatch", version = "2.1.0.43" }
 javaparser = { group = "com.github.javaparser", name = "javaparser-symbol-solver-core", version = "3.28.2" }
 jspecify = { group = "org.jspecify", name = "jspecify", version.ref = "jspecify" }
+joptsimple = { group = "net.sf.jopt-simple", name = "jopt-simple", version.ref = "joptsimple" }
 kotlin-plugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 gson = { group = "com.google.code.gson", name = "gson", version = "2.13.2" }

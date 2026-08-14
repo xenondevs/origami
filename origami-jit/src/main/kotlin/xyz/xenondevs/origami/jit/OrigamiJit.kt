@@ -1,6 +1,7 @@
 package xyz.xenondevs.origami.jit
 
 import com.llamalad7.mixinextras.MixinExtrasBootstrap
+import joptsimple.OptionParser
 import org.spongepowered.asm.launch.MixinBootstrap
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer
 import org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory
@@ -14,12 +15,14 @@ import xyz.xenondevs.origami.transformer.runtime.MixinTransformer
 import xyz.xenondevs.origami.transformer.runtime.TransformerRegistry
 import xyz.xenondevs.origami.util.WriteOnlyArrayList
 import xyz.xenondevs.origami.util.finishMixinPhases
+import java.io.File
 import java.io.InputStream
 import java.lang.instrument.Instrumentation
 import java.lang.invoke.MethodHandles
 import java.net.JarURLConnection
 import java.net.URI
 import java.net.URL
+import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
@@ -57,7 +60,7 @@ object OrigamiJit : OrigamiEnvironment {
     
     @Suppress("unused") // called from OrigamiAgent#initOrigami
     @JvmStatic
-    fun init(urls: Array<URL>, minecraftLoader: ClassLoader) {
+    fun init(urls: Array<URL>, minecraftLoader: ClassLoader, args: Array<String>) {
         check(minecraftLoader is PatchingClassLoader) { "Minecraft classloader was not initialized by Origami" }
         
         this.minecraftLoader = minecraftLoader
@@ -80,23 +83,41 @@ object OrigamiJit : OrigamiEnvironment {
         System.setProperty("mixin.service", OrigamiMixinService::class.java.canonicalName)
         MixinBootstrap.init()
         
-        pluginLoader = PluginLoader()
-        // TODO: support command-line plugins
-        val pluginJars = Path("plugins/").listDirectoryEntries().filter { it.extension.equals("jar", true) }
-        pluginLoader!!.loadPlugins(pluginJars)
+        val loader = PluginLoader()
+        pluginLoader = loader
+        loader.loadPlugins(findPluginJars() + parseExtraPlugins(args))
         
         finishMixinPhases()
         MixinExtrasBootstrap.init()
         
         transformerRegistry = TransformerRegistry(listOf(
-            AccessTransformer(pluginLoader!!.accessWidener),
-            MixinTransformer(mixinTransformer!!, pluginLoader!!.mixinConfigs)
+            AccessTransformer(loader.accessWidener),
+            MixinTransformer(mixinTransformer!!, loader.mixinConfigs)
         ))
     }
     
     override fun offer(factory: IMixinTransformerFactory) {
         mixinTransformer = factory.createTransformer()
     }
+
+    private fun parseExtraPlugins(args: Array<String>): List<Path> {
+        val parser = OptionParser().apply { allowsUnrecognizedOptions() }
+        val extraPluginJars = parser
+            .acceptsAll(listOf("add-plugin", "add-extra-plugin-jar"))
+            .withRequiredArg()
+            .ofType(File::class.java)
+        val extraPluginDirectories = parser
+            .acceptsAll(listOf("add-plugin-dir", "add-extra-plugin-dir"))
+            .withRequiredArg()
+            .ofType(File::class.java)
+        
+        val options = parser.parse(*args)
+        return options.valuesOf(extraPluginJars).map(File::toPath) +
+            options.valuesOf(extraPluginDirectories).flatMap { findPluginJars(it.toPath()) }
+    }
+
+    private fun findPluginJars(directory: Path = Path("plugins/")): List<Path> =
+        directory.listDirectoryEntries().filter { it.extension.equals("jar", true) }
     
     override fun getMinecraftResourceAsStream(name: String): InputStream? =
         minecraftLoader?.getResourceAsStream(name)
