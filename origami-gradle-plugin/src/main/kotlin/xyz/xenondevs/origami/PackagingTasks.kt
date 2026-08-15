@@ -12,30 +12,27 @@ import xyz.xenondevs.origami.extension.OrigamiExtension
 import xyz.xenondevs.origami.task.packaging.PrepareOrigamiLoaderTask
 import xyz.xenondevs.origami.task.packaging.PrepareOrigamiMarkerTask
 
-internal fun Project.registerPackagingTasks() {
+internal fun Project.registerPackagingTasks(configs: OrigamiConfigurations) {
     val ext = this.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)
     
     val prepareLoader = tasks.register<PrepareOrigamiLoaderTask>("_oriPrepareLoader") {
-        val origamiJitConfig = configurations.named(ORIGAMI_JIT_CONFIG)
-        val origamiJitInjectablesConfig = configurations.named(ORIGAMI_JIT_INJECTABLES_CONFIG)
-        
         libraryPaths.set(
-            origamiJitConfig.zip(origamiJitInjectablesConfig) { c1, c2 ->
-                c1.incoming.artifacts.resolvedArtifacts.zip(c2.incoming.artifacts.resolvedArtifacts) { a1, a2 ->
-                    (a1 + a2).mapNotNull { artifact ->
-                        val id = artifact.id.componentIdentifier as? ModuleComponentIdentifier
-                            ?: return@mapNotNull null
-                        val path = ext.librariesDirectory.get().removePrefix("/").removeSuffix("/") +
-                            "/" + id.group.replace('.', '/') + "/" + id.module + "/" + id.version + "/" + artifact.file.name
-                        artifact.file.absolutePath to path
-                    }.toMap()
-                }
-            }.flatMap { it }
+            configs.jit.incoming.artifacts.resolvedArtifacts.zip(
+                configs.jitInjectables.incoming.artifacts.resolvedArtifacts
+            ) { jitArtifacts, injectableArtifacts ->
+                (jitArtifacts + injectableArtifacts).mapNotNull { artifact ->
+                    val id = artifact.id.componentIdentifier as? ModuleComponentIdentifier
+                        ?: return@mapNotNull null
+                    val path = ext.librariesDirectory.get().removePrefix("/").removeSuffix("/") +
+                        "/" + id.group.replace('.', '/') + "/" + id.module + "/" + id.version + "/" + artifact.file.name
+                    artifact.file.absolutePath to path
+                }.toMap()
+            }
         )
         
-        origamiConfig.from(origamiJitConfig)
-        injectablesConfig.from(origamiJitInjectablesConfig)
-        origamiLoaderConfig.from(configurations.named(ORIGAMI_JIT_LOADER_CONFIG))
+        origamiConfig.from(configs.jit)
+        injectablesConfig.from(configs.jitInjectables)
+        origamiLoaderConfig.from(configs.jitLoader)
         librariesDirectory.set(ext.librariesDirectory)
         outputDir.set(ext.cache.dir("loader-files"))
     }

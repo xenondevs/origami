@@ -3,6 +3,8 @@ package xyz.xenondevs.origami.util
 import org.gradle.StartParameter
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.artifacts.Configuration
+import org.gradle.api.file.ProjectLayout
 import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.file.RegularFile
 import org.gradle.api.file.RegularFileProperty
@@ -12,6 +14,7 @@ import org.gradle.api.tasks.TaskProvider
 import org.gradle.internal.DefaultTaskExecutionRequest
 import org.gradle.kotlin.dsl.setProperty
 import xyz.xenondevs.origami.task.setup.InstallTask
+import java.io.File
 import java.nio.file.Path
 
 internal inline fun <reified T : Any> ObjectFactory.providerSet(
@@ -59,3 +62,16 @@ internal fun RegularFileProperty.getAsPath(): Path =
 
 internal val RegularFile.asPath: Path
     get() = asFile.toPath()
+
+internal fun Provider<File>.toRegular(layout: ProjectLayout): Provider<RegularFile> =
+    layout.file(this)
+
+internal fun Configuration.singleRegularFile(
+    layout: ProjectLayout,
+    optional: Boolean = false
+): Provider<RegularFile> {
+    val files = elements
+    return (if (optional) files.filter { it.isNotEmpty() } else files)
+        .map { it.single().asFile }
+        .toRegular(layout)
+}

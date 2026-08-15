@@ -2,90 +2,148 @@ package xyz.xenondevs.origami
 
 import org.gradle.api.Named
 import org.gradle.api.Project
+import org.gradle.api.artifacts.Configuration
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.Usage
+import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.maven
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.repositories
+import xyz.xenondevs.origami.value.DevBundle
+import xyz.xenondevs.origami.value.MacheConfig
+import xyz.xenondevs.origami.value.MacheDependencies
+import xyz.xenondevs.origami.value.MavenArtifact
 
-internal fun Project.registerConfigurations() {
-    configurations.register(DEV_BUNDLE_CONFIG) {
+internal class OrigamiConfigurations(private val project: Project) {
+    
+    private val configurations = project.configurations
+    private val dependencyFactory = project.dependencies
+    
+    val devBundle = configurations.register("paperweightDevelopmentBundle") {
         attributes.attribute(
             Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
-            objects.named("zip")
+            project.objects.named("zip")
         )
     }
-    configurations.register(DEV_BUNDLE_COMPILE_CLASSPATH) {
+    val devBundleCompileClasspath = configurations.register("paperweightDevelopmentBundleCompileClasspath") {
         attributes {
             attribute(
                 Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
-                objects.named("serverDependencies")
+                project.objects.named("serverDependencies")
             )
-            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_API))
+            attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage.JAVA_API))
         }
     }
-    configurations.register(DEV_BUNDLE_RUNTIME_CLASSPATH) {
+    val devBundleRuntimeClasspath = configurations.register("paperweightDevelopmentBundleRuntimeClasspath") {
         attributes {
             attribute(
                 Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
-                objects.named("serverDependencies")
+                project.objects.named("serverDependencies")
             )
-            attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+            attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage.JAVA_RUNTIME))
         }
     }
-    configurations.register(MACHE_CONFIG) {
+    
+    val mache = configurations.detachedConfiguration().apply {
         attributes.attribute(
             Attribute.of("io.papermc.mache.output", Named::class.java),
-            objects.named("zip")
+            project.objects.named("zip")
         )
     }
-    configurations.register(CODEBOOK_CONFIG) { isTransitive = false }
-    configurations.register(PARAM_MAPPINGS_CONFIG) { isTransitive = false }
-    configurations.register(CONSTANTS_CONFIG) { isTransitive = false }
-    configurations.register(REMAPPER_CONFIG) { isTransitive = false }
-    configurations.register(DECOMPILER_CONFIG) { isTransitive = false }
+    val codebook = configurations.detachedConfiguration().apply { isTransitive = false }
+    val paramMappings = configurations.detachedConfiguration().apply { isTransitive = false }
+    val constants = configurations.detachedConfiguration().apply { isTransitive = false }
+    val remapper = configurations.detachedConfiguration().apply { isTransitive = false }
+    val decompiler = configurations.detachedConfiguration().apply { isTransitive = false }
     
-    configurations.register(ORIGAMI_JIT_CONFIG)
-    dependencies.addProvider(
-        ORIGAMI_JIT_CONFIG,
-        providers.provider { "xyz.xenondevs.origami:origami-jit:${OrigamiPlugin.version}" }
-    )
-    configurations.register(ORIGAMI_JIT_LOADER_CONFIG)
-    dependencies.addProvider(
-        ORIGAMI_JIT_LOADER_CONFIG,
-        providers.provider { "xyz.xenondevs.origami:origami-jit-loader:${OrigamiPlugin.version}" }
-    )
-    configurations.register(ORIGAMI_JIT_INJECTABLES_CONFIG)
-    dependencies.addProvider(
-        ORIGAMI_JIT_INJECTABLES_CONFIG,
-        providers.provider { "xyz.xenondevs.origami:origami-injectables-jit:${OrigamiPlugin.version}" }
-    )
-    configurations.register(ORIGAMI_AOT_PATCHER_CONFIG)
-    dependencies.addProvider(
-        ORIGAMI_AOT_PATCHER_CONFIG,
-        providers.provider { "xyz.xenondevs.origami:origami-aot:${OrigamiPlugin.version}" }
-    )
-    configurations.register(ORIGAMI_AOT_INJECTABLES_CONFIG)
-    dependencies.addProvider(
-        ORIGAMI_AOT_INJECTABLES_CONFIG,
-        providers.provider { "xyz.xenondevs.origami:origami-injectables-aot:${OrigamiPlugin.version}" }
-    )
-    configurations.register(ORIGAMI_AOT_PLUGIN_CONFIG)
-    dependencies.addProvider(
-        ORIGAMI_AOT_PLUGIN_CONFIG,
-        providers.provider { "xyz.xenondevs.origami:origami-aot-plugin:${OrigamiPlugin.version}" }
-    )
+    val jit = origamiDependency("origami-jit")
+    val jitInjectables = origamiDependency("origami-injectables-jit")
+    val jitLoader = origamiDependency("origami-jit-loader")
+    val aotPatcher = origamiDependency("origami-aot")
+    val aotInjectables = origamiDependency("origami-injectables-aot")
+    val aotPlugin = origamiDependency("origami-aot-plugin")
     
-    repositories {
-        maven("https://repo.papermc.io/repository/maven-public/") {
-            content {
-                onlyForConfigurations(DEV_BUNDLE_CONFIG, DEV_BUNDLE_COMPILE_CLASSPATH, MACHE_CONFIG, ORIGAMI_AOT_PLUGIN_CONFIG)
-            }
+    init {
+        configureRepositories()
+    }
+    
+    fun configureMache(devBundleInfo: Provider<DevBundle>, macheConfig: Provider<MacheConfig>) {
+        fun Configuration.addMacheDependencies(selector: MacheDependencies.() -> List<MavenArtifact>?) {
+            dependencies.addAllLater(
+                macheConfig.map { config ->
+                    config.dependencies.selector().orEmpty()
+                        .map { dependencyFactory.create(it.toDependencyString()) }
+                }
+            )
         }
-        maven("https://maven.fabricmc.net/") {
-            content {
-                onlyForConfigurations(ORIGAMI_JIT_CONFIG, ORIGAMI_JIT_INJECTABLES_CONFIG, ORIGAMI_AOT_INJECTABLES_CONFIG)
+        
+        mache.dependencies.addAllLater(
+            devBundleInfo.map { it.mache.coordinates.map(dependencyFactory::create) }
+        )
+        codebook.addMacheDependencies { codebook }
+        paramMappings.addMacheDependencies { paramMappings }
+        constants.addMacheDependencies { constants }
+        remapper.addMacheDependencies { remapper }
+        decompiler.addMacheDependencies { decompiler }
+        
+        project.afterEvaluate {
+            macheConfig.get().repositories.forEach { repository ->
+                repositories.maven(repository.url) {
+                    name = repository.name
+                    content {
+                        repository.groups.forEach(::includeGroupAndSubgroups)
+                        onlyForConfigurations(
+                            codebook.name,
+                            paramMappings.name,
+                            constants.name,
+                            remapper.name,
+                            decompiler.name
+                        )
+                    }
+                }
             }
         }
     }
+    
+    private fun origamiDependency(module: String) = configurations.detachedConfiguration(
+        dependencyFactory.create("xyz.xenondevs.origami:$module:${OrigamiPlugin.version}")
+    )
+    
+    private fun configureRepositories() = project.repositories {
+        maven("https://repo.xenondevs.xyz/releases/") {
+            content {
+                includeGroup("xyz.xenondevs.origami")
+                onlyForConfigurations(
+                    jit.name,
+                    jitInjectables.name,
+                    jitLoader.name,
+                    aotPatcher.name,
+                    aotInjectables.name,
+                    aotPlugin.name
+                )
+            }
+        }
+        
+        maven("https://repo.papermc.io/repository/maven-public/") {
+            content {
+                onlyForConfigurations(
+                    devBundle.name,
+                    devBundleCompileClasspath.name,
+                    mache.name,
+                    aotPlugin.name
+                )
+            }
+        }
+        
+        maven("https://maven.fabricmc.net/") {
+            content {
+                onlyForConfigurations(
+                    jit.name,
+                    jitInjectables.name,
+                    aotInjectables.name
+                )
+            }
+        }
+    }
+    
 }

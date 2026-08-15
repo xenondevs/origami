@@ -13,23 +13,6 @@ import org.gradle.kotlin.dsl.getByType
 import xyz.xenondevs.origami.extension.OrigamiExtension
 import javax.inject.Inject
 
-internal const val DEV_BUNDLE_CONFIG = "paperweightDevelopmentBundle"
-internal const val DEV_BUNDLE_COMPILE_CLASSPATH = "paperweightDevelopmentBundleCompileClasspath"
-internal const val DEV_BUNDLE_RUNTIME_CLASSPATH = "paperweightDevelopmentBundleRuntimeClasspath"
-internal const val MACHE_CONFIG = "macheConfig"
-internal const val CODEBOOK_CONFIG = "codebookConfig"
-internal const val PARAM_MAPPINGS_CONFIG = "paramMappingsConfig"
-internal const val CONSTANTS_CONFIG = "constantsConfig"
-internal const val REMAPPER_CONFIG = "remapperConfig"
-internal const val DECOMPILER_CONFIG = "decompilerConfig"
-
-internal const val ORIGAMI_JIT_CONFIG = "origamiJitConfig"
-internal const val ORIGAMI_JIT_INJECTABLES_CONFIG = "origamiJitInjectablesConfig"
-internal const val ORIGAMI_JIT_LOADER_CONFIG = "origamiJitLoaderConfig"
-internal const val ORIGAMI_AOT_PATCHER_CONFIG = "origamiAotPatcherConfig"
-internal const val ORIGAMI_AOT_INJECTABLES_CONFIG = "origamiAotInjectablesConfig"
-internal const val ORIGAMI_AOT_PLUGIN_CONFIG = "origamiAotPluginConfig"
-
 internal const val ORIGAMI_TASK_GROUP = "origami"
 internal const val ORIGAMI_EXTENSION = "origami"
 
@@ -52,14 +35,14 @@ abstract class OrigamiPlugin : Plugin<Project> {
     
     override fun apply(target: Project) {
         target.plugins.apply("java")
-        target.registerConfigurations()
-        target.registerExtensions()
+        val configurations = OrigamiConfigurations(target)
+        target.registerExtensions(configurations)
         val ext = target.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)
         localRepo = ext.cache.dir("local-repo")
         
-        target.registerTasks(this)
-        target.registerPackagingTasks()
-        target.registerRunTasks(this)
+        target.registerTasks(this, configurations)
+        target.registerPackagingTasks(configurations)
+        target.registerRunTasks(this, configurations)
     }
     
     companion object {

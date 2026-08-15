@@ -25,39 +25,37 @@ import xyz.xenondevs.origami.task.setup.WidenTask
 import xyz.xenondevs.origami.util.getIdeaSourcesDownloadTasks
 import xyz.xenondevs.origami.util.isIdeaSync
 import xyz.xenondevs.origami.util.prependTaskRequest
+import xyz.xenondevs.origami.util.singleRegularFile
+import xyz.xenondevs.origami.util.toRegular
 import xyz.xenondevs.origami.value.DevBundle
 import xyz.xenondevs.origami.value.DevBundleHashSource
 import xyz.xenondevs.origami.value.DevBundleValueSource
 import xyz.xenondevs.origami.value.MacheConfig
 import xyz.xenondevs.origami.value.MacheConfigValueSource
-import java.io.File
 
-internal fun Project.registerTasks(plugin: OrigamiPlugin) {
-    fun Provider<File>.toRegular() = layout.file(this)
-    
+internal fun Project.registerTasks(plugin: OrigamiPlugin, configs: OrigamiConfigurations) {
     val ext: OrigamiExtension = this.extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION)
-    val bundleZip: Provider<RegularFile> = configurations.named(DEV_BUNDLE_CONFIG).map { it.singleFile }.toRegular()
-    val macheZip: Provider<RegularFile> = configurations.named(MACHE_CONFIG).map { it.singleFile }.toRegular()
+    val bundleZip: Provider<RegularFile> = configs.devBundle.map { it.singleFile }.toRegular(layout)
+    val macheZip = configs.mache.singleRegularFile(layout)
     val devBundleInfo: Provider<DevBundle> = providers.of(DevBundleValueSource::class) { parameters.zip.set(bundleZip) }
     val devBundleHash: Provider<String> = providers.of(DevBundleHashSource::class) { parameters.zip.set(bundleZip) }
-    val macheConfig: Provider<MacheConfig> =
-        providers.of(MacheConfigValueSource::class) { parameters.zip.set(macheZip) }
+    val macheConfig: Provider<MacheConfig> = providers.of(MacheConfigValueSource::class) { parameters.zip.set(macheZip) }
     val mcVersion: Provider<String> = devBundleInfo.map(DevBundle::minecraftVersion)
     val sharedWorkDir: Provider<Directory> = ext.sharedCache.zip(devBundleHash) { cache, hash -> cache.dir(hash) }
     val lockFile: Provider<RegularFile> = sharedWorkDir.map { it.file(".lock") }
     val launcher = plugin.javaLauncherFor(project)
     
     @Suppress("ReplaceSizeCheckWithIsNotEmpty") // broken for DependencySet
-    val hasDevBundle: Provider<Boolean> = configurations.named(DEV_BUNDLE_CONFIG).map { it.allDependencies.size != 0 }
-    val resolvedDevBundleVersion: Provider<String> = configurations.named(DEV_BUNDLE_CONFIG).map { cfg ->
+    val hasDevBundle: Provider<Boolean> = configs.devBundle.map { it.allDependencies.size != 0 }
+    val resolvedDevBundleVersion: Provider<String> = configs.devBundle.map { cfg ->
         val selectedId = cfg.incoming.resolutionResult.root.dependencies
             .filterIsInstance<ResolvedDependencyResult>()
             .single().selected.id
         (selectedId as? ModuleComponentIdentifier)?.version
-            ?: error("Expected $DEV_BUNDLE_CONFIG to resolve to a module component, but got $selectedId")
+            ?: error("Expected ${configs.devBundle.name} to resolve to a module component, but got $selectedId")
     }
     
-    addDependenciesToPipelineConfigs(devBundleInfo, macheConfig)
+    configs.configureMache(devBundleInfo, macheConfig)
     
     val clean = tasks.register<Delete>("_oriClean") {
         group = ORIGAMI_TASK_GROUP
@@ -92,7 +90,7 @@ internal fun Project.registerTasks(plugin: OrigamiPlugin) {
     val installPom = tasks.register<InstallTask.Pom>("_oriInstallPom") {
         configureCommon()
         serverDependencies.set(
-            project.configurations.named(DEV_BUNDLE_COMPILE_CLASSPATH).map { cfg ->
+            configs.devBundleCompileClasspath.map { cfg ->
                 cfg.incoming.resolutionResult.root.dependencies
                     .filterIsInstance<ResolvedDependencyResult>()
                     .single().selected.dependencies
@@ -154,10 +152,10 @@ internal fun Project.registerTasks(plugin: OrigamiPlugin) {
         vanillaServer.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverJar))
         vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
         mappings.set(vanillaDownloads.flatMap(VanillaDownloadTask::serverMappings).filter { it.asFile.exists() })
-        paramMappings.set(configurations.named(PARAM_MAPPINGS_CONFIG).filter { !it.isEmpty }.map { it.singleFile }.toRegular())
-        constants.set(configurations.named(CONSTANTS_CONFIG).filter { !it.isEmpty }.map { it.singleFile }.toRegular())
-        codebook.set(configurations.named(CODEBOOK_CONFIG).map { it.singleFile }.toRegular())
-        remapper.set(configurations.named(REMAPPER_CONFIG).filter { !it.isEmpty }.map { it.singleFile }.toRegular())
+        paramMappings.set(configs.paramMappings.singleRegularFile(layout, optional = true))
+        constants.set(configs.constants.singleRegularFile(layout, optional = true))
+        codebook.set(configs.codebook.singleRegularFile(layout))
+        remapper.set(configs.remapper.singleRegularFile(layout, optional = true))
         remapperArgs.set(macheConfig.map { it.remapperArgs })
         javaLauncher.set(launcher)
         minecraftVersion.set(mcVersion)
@@ -172,7 +170,7 @@ internal fun Project.registerTasks(plugin: OrigamiPlugin) {
         
         remappedJar.set(remap.flatMap(CodebookTask::remappedJar))
         vanillaLibraries.set(vanillaDownloads.flatMap(VanillaDownloadTask::librariesDir))
-        decompiler.set(configurations.named(DECOMPILER_CONFIG).map { it.singleFile }.toRegular())
+        decompiler.set(configs.decompiler.singleRegularFile(layout))
         decompilerArgs.set(macheConfig.map { it.decompilerArgs })
         macheFile.set(macheZip)
         javaLauncher.set(launcher)
@@ -253,64 +251,6 @@ internal fun Project.registerTasks(plugin: OrigamiPlugin) {
         repositories {
             maven(plugin.localRepo) {
                 content { includeGroup("xyz.xenondevs.origami.patched-server") }
-            }
-            
-            macheConfig.get().repositories.forEach { repo ->
-                maven(repo.url) {
-                    name = repo.name
-                    content {
-                        repo.groups.forEach(::includeGroupAndSubgroups)
-                        onlyForConfigurations(
-                            CODEBOOK_CONFIG, PARAM_MAPPINGS_CONFIG, CONSTANTS_CONFIG, REMAPPER_CONFIG, DECOMPILER_CONFIG
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun Project.addDependenciesToPipelineConfigs(devBundleInfo: Provider<DevBundle>, macheConfig: Provider<MacheConfig>) {
-    val deps = this.dependencies
-    this.configurations.apply {
-        named(MACHE_CONFIG) {
-            defaultDependencies {
-                addAllLater(devBundleInfo.map { it.mache.coordinates.map(deps::create) })
-            }
-        }
-        named(CODEBOOK_CONFIG) {
-            defaultDependencies {
-                addAllLater(macheConfig.map { mache ->
-                    mache.dependencies.codebook.map { deps.create(it.toDependencyString()) }
-                })
-            }
-        }
-        named(PARAM_MAPPINGS_CONFIG) {
-            defaultDependencies {
-                addAllLater(macheConfig.map { mache ->
-                    mache.dependencies.paramMappings?.map { deps.create(it.toDependencyString()) } ?: emptyList()
-                })
-            }
-        }
-        named(CONSTANTS_CONFIG) {
-            defaultDependencies {
-                addAllLater(macheConfig.map { mache ->
-                    mache.dependencies.constants.map { deps.create(it.toDependencyString()) }
-                })
-            }
-        }
-        named(REMAPPER_CONFIG) {
-            defaultDependencies {
-                addAllLater(macheConfig.map { mache ->
-                    mache.dependencies.remapper?.map { deps.create(it.toDependencyString()) } ?: emptyList()
-                })
-            }
-        }
-        named(DECOMPILER_CONFIG) {
-            defaultDependencies {
-                addAllLater(macheConfig.map { mache ->
-                    mache.dependencies.decompiler.map { deps.create(it.toDependencyString()) }
-                })
             }
         }
     }

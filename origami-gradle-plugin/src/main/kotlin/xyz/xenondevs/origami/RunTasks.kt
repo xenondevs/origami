@@ -13,7 +13,7 @@ import xyz.xenondevs.origami.task.run.RunServer
 import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
 import xyz.xenondevs.origami.value.ListArgumentProvider
 
-fun Project.registerRunTasks(plugin: OrigamiPlugin) {
+internal fun Project.registerRunTasks(plugin: OrigamiPlugin, configs: OrigamiConfigurations) {
     val ext = extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION).runServer
     val applyBinDiff = tasks.named<ApplyBinDiffTask>("_oriApplyBinDiff")
     
@@ -26,14 +26,14 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
         dependsOn(applyBinDiff)
 
         javaLauncher.set(plugin.javaLauncherFor(project))
-        setClasspath(configurations.getByName(ORIGAMI_AOT_PATCHER_CONFIG))
+        setClasspath(configs.aotPatcher)
         
         serverJar.set(applyBinDiff.flatMap(ApplyBinDiffTask::patchedJar))
         outputJar.set(layout.buildDirectory.file("origami/paper-server-patched.jar"))
         plugins.from(ext.plugins)
         patchFingerprint.set(extractPatchInputs.flatMap { it.outputDir })
-        serverClasspath.from(configurations.named(DEV_BUNDLE_COMPILE_CLASSPATH))
-        serverClasspath.from(configurations.named(ORIGAMI_AOT_INJECTABLES_CONFIG))
+        serverClasspath.from(configs.devBundleCompileClasspath)
+        serverClasspath.from(configs.aotInjectables)
     }
     
     val serverLauncher = ext.javaLauncher.orElse(plugin.javaLauncherFor(26))
@@ -52,13 +52,13 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
         standardInput = System.`in`
         
         classpath(patchRunServerJar.flatMap { it.outputJar })
-        classpath(configurations.named(DEV_BUNDLE_RUNTIME_CLASSPATH))
-        classpath(configurations.named(ORIGAMI_AOT_INJECTABLES_CONFIG))
+        classpath(configs.devBundleRuntimeClasspath)
+        classpath(configs.aotInjectables)
         classpath(ext.classpath)
         
         mainClass.set(serverMainClass)
         
-        plugins.from(configurations.named(ORIGAMI_AOT_PLUGIN_CONFIG))
+        plugins.from(configs.aotPlugin)
         plugins.from(ext.plugins)
     }
     
@@ -70,10 +70,10 @@ fun Project.registerRunTasks(plugin: OrigamiPlugin) {
     val generateAotCacheFingerprint = tasks.register<GenerateAotCacheFingerprint>("_oriGenerateAotCacheFingerprint") {
         patchFingerprint.set(extractPatchInputs.flatMap { it.outputDir })
         classpath.from(patchRunServerJar.flatMap { it.outputJar })
-        classpath.from(configurations.named(DEV_BUNDLE_RUNTIME_CLASSPATH))
-        classpath.from(configurations.named(ORIGAMI_AOT_INJECTABLES_CONFIG))
+        classpath.from(configs.devBundleRuntimeClasspath)
+        classpath.from(configs.aotInjectables)
         classpath.from(ext.classpath)
-        plugins.from(configurations.named(ORIGAMI_AOT_PLUGIN_CONFIG))
+        plugins.from(configs.aotPlugin)
         plugins.from(ext.plugins)
         javaReleaseFile.set(serverLauncher.map { it.metadata.installationPath.file("release") })
         jvmArgs.set(ext.jvmArgs)
