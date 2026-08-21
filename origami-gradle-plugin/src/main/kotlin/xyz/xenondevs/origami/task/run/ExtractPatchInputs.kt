@@ -61,10 +61,14 @@ internal abstract class ExtractPatchInputs : DefaultTask() {
             }
             
             // 2nd pass: copy mixin classes
+            val innerMixinPrefixes = mixinClasses.map { it.removeSuffix(".class") + '$' }
             ZipInputStream(plugin.inputStream().buffered()).use { zin ->
                 generateSequence { zin.nextEntry }
                     .filter { !it.isDirectory }
-                    .filter { it.name in mixinClasses }
+                    .filter { entry ->
+                        entry.name in mixinClasses
+                            || entry.name.endsWith(".class") && innerMixinPrefixes.any(entry.name::startsWith)
+                    }
                     .forEach { entry ->
                         out.resolve(entry.name)
                             .apply { parentFile.mkdirs() }

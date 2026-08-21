@@ -96,20 +96,36 @@ class PluginLoader {
             val mixins = (field.get(mixinConfig) as List<String>).map { "$mixinPackage/$it".replace('.', '/') }
             
             for (mixinPath in mixins) {
-                val jarPath = "$mixinPath.class"
-                val je = jar.getJarEntry(jarPath)
-                    ?: throw IllegalStateException("Mixin class '$mixinPath' not found in plugin '${plugin.name}' (${plugin.id})")
-                
-                val clazz = ClassNode()
-                jar.getInputStream(je).use { inp ->
-                    ClassReader(inp).accept(clazz, ClassReader.SKIP_FRAMES)
+                val classes = readMixinAndNestedClasses(jar, mixinPath)
+                if (mixinPath !in classes)
+                    throw IllegalStateException("Mixin class '$mixinPath' not found in plugin '${plugin.name}' (${plugin.id})")
+                for ((name, clazz) in classes) {
+                    DynamicInvoker.transform(clazz, plugin.name, mixinPath)
+                    mixinClasses[name] = clazz
                 }
-                DynamicInvoker.transform(clazz, plugin.name)
-                mixinClasses[mixinPath] = clazz
             }
             
             mixinConfigs.add(mixinConfig)
         }
+    }
+    
+    private fun readMixinAndNestedClasses(jar: JarFile, mixinPath: String): Map<String, ClassNode> {
+        val classFile = "$mixinPath.class"
+        val innerClassPrefix = $$"$${mixinPath}$"
+        val classes = LinkedHashMap<String, ClassNode>()
+        
+        jar.entries().asSequence()
+            .filter { !it.isDirectory && it.name.endsWith(".class") }
+            .filter { it.name == classFile || it.name.startsWith(innerClassPrefix) }
+            .forEach { entry ->
+                val clazz = ClassNode()
+                jar.getInputStream(entry).use { input ->
+                    ClassReader(input).accept(clazz, ClassReader.SKIP_FRAMES)
+                }
+                classes[clazz.name] = clazz
+            }
+        
+        return classes
     }
     
     private fun loadPlugin(info: PluginInfo) {

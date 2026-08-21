@@ -30,8 +30,7 @@ private val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAM
 // TODO: Referencing other plugins from within mixins
 object DynamicInvoker {
     
-    fun transform(clazz: ClassNode, pluginName: String) {
-        val currentMixin = clazz.name
+    fun transform(clazz: ClassNode, pluginName: String, currentMixin: String = clazz.name) {
         clazz.methods.forEach { m ->
             val insns = m.instructions
             val iter = insns.iterator()
