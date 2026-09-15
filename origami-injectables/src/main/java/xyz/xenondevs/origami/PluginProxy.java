@@ -98,7 +98,7 @@ public final class PluginProxy {
         MethodType factoryType,
         String plugin,
         String originalFactoryDesc,
-        MethodType interfaceMethodType,
+        String interfaceMethodDesc,
         String targetOwner,
         String targetName,
         String originalTargetDesc,
@@ -106,34 +106,22 @@ public final class PluginProxy {
         int handleTag
     ) {
         try {
-            var clazz = Class.forName(targetOwner.replace('/', '.'), false, LookupProxy.getLoaderFor(plugin));
-            var lookup = LookupProxy.getPrivateLookupFor(plugin, clazz);
-            var mh = switch (handleTag) {
-                case Opcodes.H_INVOKEVIRTUAL, Opcodes.H_INVOKEINTERFACE ->
-                    lookup.findVirtual(clazz, targetName, toMethodType(originalTargetDesc, lookup));
-                case Opcodes.H_INVOKESTATIC ->
-                    lookup.findStatic(clazz, targetName, toMethodType(originalTargetDesc, lookup));
-                case Opcodes.H_NEWINVOKESPECIAL ->
-                    lookup.findConstructor(clazz, toMethodType(originalTargetDesc, lookup));
-                case Opcodes.H_GETFIELD -> lookup.findGetter(clazz, targetName, toClass(originalTargetDesc, lookup));
-                case Opcodes.H_GETSTATIC ->
-                    lookup.findStaticGetter(clazz, targetName, toClass(originalTargetDesc, lookup));
-                case Opcodes.H_PUTFIELD -> lookup.findSetter(clazz, targetName, toClass(originalTargetDesc, lookup));
-                case Opcodes.H_PUTSTATIC ->
-                    lookup.findStaticSetter(clazz, targetName, toClass(originalTargetDesc, lookup));
-                default -> throw new BootstrapMethodError("Unsupported handle tag: " + handleTag);
-            };
-            
-            CallSite lambdaSite = LambdaMetafactory.metafactory(
-                lookup,
+            var pluginLookup = LookupProxy.getLookupFor(plugin);
+            var clazz = Class.forName(targetOwner.replace('/', '.'), false, pluginLookup.lookupClass().getClassLoader());
+            var targetLookup = caller.lookupClass() == clazz
+                ? caller
+                : MethodHandles.privateLookupIn(clazz, pluginLookup);
+            var mh = findTargetHandle(targetLookup, clazz, targetName, originalTargetDesc, handleTag);
+            return createMetafactoryCallSite(
+                targetLookup,
                 interfaceMethod,
-                restoreFactoryType(factoryType, originalFactoryDesc, lookup),
-                interfaceMethodType,
+                factoryType,
+                pluginLookup,
+                originalFactoryDesc,
+                interfaceMethodDesc,
                 mh,
-                toMethodType(originalDynamicDesc, lookup)
+                originalDynamicDesc
             );
-            
-            return new ConstantCallSite(lambdaSite.getTarget().asType(factoryType));
         } catch (Exception e) {
             throw new BootstrapMethodError(
                 "Failed to create lambda for " + targetOwner + "." + targetName +
@@ -141,6 +129,241 @@ public final class PluginProxy {
                 e
             );
         }
+    }
+
+    @SuppressWarnings("unused") // indy to this created by DynamicInvoker
+    public static CallSite proxyLocalMetafactory(
+        MethodHandles.Lookup caller,
+        String interfaceMethod,
+        MethodType factoryType,
+        String plugin,
+        String originalFactoryDesc,
+        String interfaceMethodDesc,
+        MethodHandle target,
+        String originalDynamicDesc
+    ) {
+        try {
+            return createMetafactoryCallSite(
+                caller,
+                interfaceMethod,
+                factoryType,
+                LookupProxy.getLookupFor(plugin),
+                originalFactoryDesc,
+                interfaceMethodDesc,
+                target,
+                originalDynamicDesc
+            );
+        } catch (Exception e) {
+            throw new BootstrapMethodError(
+                "Failed to create local lambda " + interfaceMethod + " in plugin " + plugin,
+                e
+            );
+        }
+    }
+
+    private static CallSite createMetafactoryCallSite(
+        MethodHandles.Lookup targetLookup,
+        String interfaceMethod,
+        MethodType factoryType,
+        MethodHandles.Lookup pluginLookup,
+        String originalFactoryDesc,
+        String interfaceMethodDesc,
+        MethodHandle target,
+        String originalDynamicDesc
+    ) throws Exception {
+        var restoredFactoryType = restoreFactoryType(factoryType, originalFactoryDesc, pluginLookup);
+        var interfaceMethodType = toMethodType(interfaceMethodDesc, pluginLookup);
+        var dynamicMethodType = toMethodType(originalDynamicDesc, pluginLookup);
+
+        if (!isVisibleFrom(restoredFactoryType.returnType(), targetLookup.lookupClass().getClassLoader())
+            || !isVisibleFrom(interfaceMethodType, targetLookup.lookupClass().getClassLoader())
+            || !isVisibleFrom(dynamicMethodType, targetLookup.lookupClass().getClassLoader())
+        ) {
+            return proxyInterfaceFactory(factoryType, restoredFactoryType.returnType(), target, dynamicMethodType);
+        }
+
+        var lambdaSite = LambdaMetafactory.metafactory(
+            targetLookup,
+            interfaceMethod,
+            restoredFactoryType,
+            interfaceMethodType,
+            target,
+            dynamicMethodType
+        );
+        return new ConstantCallSite(lambdaSite.getTarget().asType(factoryType));
+    }
+    
+    private static CallSite proxyInterfaceFactory(
+        MethodType factoryType,
+        Class<?> interfaceType,
+        MethodHandle target,
+        MethodType dynamicMethodType
+    ) throws NoSuchMethodException, IllegalAccessException {
+        var factory = MethodHandles.lookup().findStatic(
+            PluginProxy.class,
+            "createInterfaceProxy",
+            MethodType.methodType(
+                Object.class,
+                Class.class,
+                MethodHandle.class,
+                MethodType.class,
+                Object[].class
+            )
+        );
+        factory = MethodHandles.insertArguments(factory, 0, interfaceType, target, dynamicMethodType);
+        factory = factory.asCollector(Object[].class, factoryType.parameterCount());
+        return new ConstantCallSite(factory.asType(factoryType));
+    }
+    
+    private static Object createInterfaceProxy(
+        Class<?> interfaceType,
+        MethodHandle target,
+        MethodType dynamicMethodType,
+        Object[] capturedArguments
+    ) {
+        var boundTarget = MethodHandles.insertArguments(target, 0, capturedArguments);
+        return MethodHandleProxies.asInterfaceInstance(interfaceType, boundTarget.asType(dynamicMethodType));
+    }
+    
+    private static boolean isVisibleFrom(MethodType type, ClassLoader loader) {
+        if (!isVisibleFrom(type.returnType(), loader))
+            return false;
+        for (var parameter : type.parameterArray()) {
+            if (!isVisibleFrom(parameter, loader))
+                return false;
+        }
+        return true;
+    }
+    
+    private static boolean isVisibleFrom(Class<?> type, ClassLoader loader) {
+        if (type.isPrimitive())
+            return true;
+        try {
+            return Class.forName(type.getName(), false, loader) == type;
+        } catch (ClassNotFoundException ignored) {
+            return false;
+        }
+    }
+    
+    @SuppressWarnings("unused") // indy to this created by DynamicInvoker
+    public static CallSite proxyAltMetafactory(
+        MethodHandles.Lookup caller,
+        String interfaceMethod,
+        MethodType factoryType,
+        String plugin,
+        String originalFactoryDesc,
+        String interfaceMethodDesc,
+        String targetOwner,
+        String targetName,
+        String originalTargetDesc,
+        String originalDynamicDesc,
+        int handleTag,
+        int flags,
+        String... encodedOptionalArgs
+    ) {
+        try {
+            var clazz = Class.forName(targetOwner.replace('/', '.'), false, LookupProxy.getLoaderFor(plugin));
+            var lookup = LookupProxy.getPrivateLookupFor(plugin, clazz);
+            var mh = findTargetHandle(lookup, clazz, targetName, originalTargetDesc, handleTag);
+            var args = new Object[4 + encodedOptionalArgs.length];
+            args[0] = toMethodType(interfaceMethodDesc, lookup);
+            args[1] = mh;
+            args[2] = toMethodType(originalDynamicDesc, lookup);
+            args[3] = flags;
+            for (int i = 0; i < encodedOptionalArgs.length; i++) {
+                args[i + 4] = decodeBootstrapArgument(encodedOptionalArgs[i], lookup);
+            }
+            
+            var lambdaSite = LambdaMetafactory.altMetafactory(
+                lookup,
+                interfaceMethod,
+                restoreFactoryType(factoryType, originalFactoryDesc, lookup),
+                args
+            );
+            return new ConstantCallSite(lambdaSite.getTarget().asType(factoryType));
+        } catch (Exception e) {
+            throw new BootstrapMethodError(
+                "Failed to create alternate lambda for " + targetOwner + "." + targetName
+                + originalTargetDesc + " in plugin " + plugin,
+                e
+            );
+        }
+    }
+
+    @SuppressWarnings("unused") // indy to this created by DynamicInvoker
+    public static CallSite proxyLocalAltMetafactory(
+        MethodHandles.Lookup caller,
+        String interfaceMethod,
+        MethodType factoryType,
+        String plugin,
+        String originalFactoryDesc,
+        String interfaceMethodDesc,
+        MethodHandle target,
+        String originalDynamicDesc,
+        int flags,
+        String... encodedOptionalArgs
+    ) {
+        try {
+            var pluginLookup = LookupProxy.getLookupFor(plugin);
+            var interfaceMethodType = toMethodType(interfaceMethodDesc, pluginLookup);
+            var dynamicMethodType = toMethodType(originalDynamicDesc, pluginLookup);
+            var restoredFactoryType = restoreFactoryType(factoryType, originalFactoryDesc, pluginLookup);
+
+            if (flags == 0
+                && (!isVisibleFrom(restoredFactoryType.returnType(), caller.lookupClass().getClassLoader())
+                || !isVisibleFrom(interfaceMethodType, caller.lookupClass().getClassLoader())
+                || !isVisibleFrom(dynamicMethodType, caller.lookupClass().getClassLoader()))
+            ) {
+                return proxyInterfaceFactory(
+                    factoryType,
+                    restoredFactoryType.returnType(),
+                    target,
+                    dynamicMethodType
+                );
+            }
+
+            var args = new Object[4 + encodedOptionalArgs.length];
+            args[0] = interfaceMethodType;
+            args[1] = target;
+            args[2] = dynamicMethodType;
+            args[3] = flags;
+            for (int i = 0; i < encodedOptionalArgs.length; i++) {
+                args[i + 4] = decodeBootstrapArgument(encodedOptionalArgs[i], pluginLookup);
+            }
+
+            var lambdaSite = LambdaMetafactory.altMetafactory(
+                caller,
+                interfaceMethod,
+                restoredFactoryType,
+                args
+            );
+            return new ConstantCallSite(lambdaSite.getTarget().asType(factoryType));
+        } catch (Exception e) {
+            throw new BootstrapMethodError(
+                "Failed to create local alternate lambda " + interfaceMethod + " in plugin " + plugin,
+                e
+            );
+        }
+    }
+    
+    private static MethodHandle findTargetHandle(
+        MethodHandles.Lookup lookup,
+        Class<?> clazz,
+        String targetName,
+        String targetDesc,
+        int handleTag
+    ) throws NoSuchFieldException, NoSuchMethodException, IllegalAccessException, ClassNotFoundException {
+        return switch (handleTag) {
+            case Opcodes.H_INVOKEVIRTUAL, Opcodes.H_INVOKEINTERFACE ->
+                lookup.findVirtual(clazz, targetName, toMethodType(targetDesc, lookup));
+            case Opcodes.H_INVOKESTATIC -> lookup.findStatic(clazz, targetName, toMethodType(targetDesc, lookup));
+            case Opcodes.H_NEWINVOKESPECIAL -> lookup.findConstructor(clazz, toMethodType(targetDesc, lookup));
+            case Opcodes.H_GETFIELD -> lookup.findGetter(clazz, targetName, toClass(targetDesc, lookup));
+            case Opcodes.H_GETSTATIC -> lookup.findStaticGetter(clazz, targetName, toClass(targetDesc, lookup));
+            case Opcodes.H_PUTFIELD -> lookup.findSetter(clazz, targetName, toClass(targetDesc, lookup));
+            case Opcodes.H_PUTSTATIC -> lookup.findStaticSetter(clazz, targetName, toClass(targetDesc, lookup));
+            default -> throw new BootstrapMethodError("Unsupported handle tag: " + handleTag);
+        };
     }
     
     private static MethodType restoreFactoryType(
@@ -187,22 +410,23 @@ public final class PluginProxy {
         String name,
         MethodType type,
         String plugin,
+        String originalDesc,
         int isEnum,
-        String... targets
+        Object... targets
     ) {
         try {
             var lookup = LookupProxy.getLookupFor(plugin);
-            var loader = LookupProxy.getLoaderFor(plugin);
-            if (isEnum == 1)
-                throw new BootstrapMethodError("Unsupported for now");
-            
-            var targetClasses = new Class<?>[targets.length];
+            var labels = new Object[targets.length];
             for (int i = 0; i < targets.length; i++) {
-                targetClasses[i] = Class.forName(targets[i].replace('/', '.'), false, loader);
+                labels[i] = decodeSwitchArgument(targets[i], lookup);
             }
-            return SwitchBootstraps.typeSwitch(lookup, name, type, (Object[]) targetClasses);
+            var originalType = toMethodType(originalDesc, lookup);
+            var switchSite = isEnum == 1
+                ? SwitchBootstraps.enumSwitch(lookup, name, originalType, labels)
+                : SwitchBootstraps.typeSwitch(lookup, name, originalType, labels);
+            return new ConstantCallSite(switchSite.getTarget().asType(type));
         } catch (Exception e) {
-            throw new BootstrapMethodError("Failed to find classes " + Arrays.toString(targets) + " for switch bootstrap in plugin " + plugin, e);
+            throw new BootstrapMethodError("Failed to resolve switch labels " + Arrays.toString(targets) + " for plugin " + plugin, e);
         }
     }
     
@@ -241,6 +465,40 @@ public final class PluginProxy {
     
     private static MethodType toMethodType(String desc, MethodHandles.Lookup lookup) {
         return MethodType.fromMethodDescriptorString(desc, lookup.lookupClass().getClassLoader());
+    }
+    
+    private static Object decodeBootstrapArgument(
+        String argument,
+        MethodHandles.Lookup lookup
+    ) throws ClassNotFoundException {
+        if (argument.isEmpty())
+            throw new IllegalArgumentException("Empty encoded bootstrap argument");
+        
+        return switch (argument.charAt(0)) {
+            case 'C' -> toClass(argument.substring(1), lookup);
+            case 'M' -> toMethodType(argument.substring(1), lookup);
+            case 'S' -> argument.substring(1);
+            case 'I' -> Integer.valueOf(argument.substring(1));
+            default -> throw new IllegalArgumentException("Unknown encoded bootstrap argument: " + argument);
+        };
+    }
+    
+    private static Object decodeSwitchArgument(
+        Object argument,
+        MethodHandles.Lookup lookup
+    ) throws ClassNotFoundException {
+        if (!(argument instanceof String encoded))
+            return argument;
+        if (encoded.isEmpty())
+            throw new IllegalArgumentException("Empty encoded switch argument");
+        
+        return switch (encoded.charAt(0)) {
+            case 'J' -> Long.valueOf(encoded.substring(1));
+            case 'F' -> Float.valueOf(encoded.substring(1));
+            case 'D' -> Double.valueOf(encoded.substring(1));
+            case 'Z' -> Boolean.valueOf(encoded.substring(1));
+            default -> decodeBootstrapArgument(encoded, lookup);
+        };
     }
     
     private static Class<?> toClass(String desc, MethodHandles.Lookup lookup) throws ClassNotFoundException {

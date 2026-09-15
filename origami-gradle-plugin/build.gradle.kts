@@ -15,14 +15,9 @@ dependencies {
     implementation(libs.asm)
     implementation(libs.javaparser)
     testImplementation(gradleTestKit())
-    testImplementation(kotlin("test"))
 }
 
 java.toolchain.languageVersion.set(JavaLanguageVersion.of(25))
-
-tasks.test {
-    useJUnitPlatform()
-}
 
 tasks.named("check") {
     dependsOn(tasks.named("validatePlugins"))

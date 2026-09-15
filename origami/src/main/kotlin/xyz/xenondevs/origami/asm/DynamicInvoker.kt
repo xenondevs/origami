@@ -1,5 +1,6 @@
 package xyz.xenondevs.origami.asm
 
+import org.objectweb.asm.ConstantDynamic
 import org.objectweb.asm.Handle
 import org.objectweb.asm.Opcodes
 import org.objectweb.asm.Type
@@ -22,8 +23,11 @@ private const val PLUGIN_PROXY_NAME = "xyz/xenondevs/origami/PluginProxy"
 private val METHOD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMethod", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
 private val CONSTRUCTOR_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyConstructor", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
 private val FIELD_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyField", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
-private val METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
-private val SWITCH_BOOTSTRAPS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxySwitch", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+private val METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;", false)
+private val LOCAL_METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyLocalMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/invoke/MethodHandle;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+private val ALT_METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyAltMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+private val LOCAL_ALT_METAFACTORY_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyLocalAltMetafactory", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/invoke/MethodHandle;Ljava/lang/String;I[Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
+private val SWITCH_BOOTSTRAPS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxySwitch", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;I[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;", false)
 private val INSTANCE_OF_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyInstanceOf", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
 private val CLASS_PROXY_HANDLE = Handle(Opcodes.H_INVOKESTATIC, PLUGIN_PROXY_NAME, "proxyClass", $$"(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/invoke/CallSite;", false)
 
@@ -58,7 +62,7 @@ object DynamicInvoker {
         
         when (insn.opcode) {
             Opcodes.NEW -> {
-                if (insn.next.opcode != Opcodes.DUP) {
+                if (insn.next?.opcode != Opcodes.DUP) {
                     // TODO: new call without doing anything with the result
                     throw IllegalStateException("Unknown object allocation pattern. Expected DUP after NEW")
                 }
@@ -98,7 +102,7 @@ object DynamicInvoker {
         when (insn.opcode) {
             Opcodes.INVOKEVIRTUAL, Opcodes.INVOKESTATIC, Opcodes.INVOKEINTERFACE -> {
                 val returnType = fixType(Type.getReturnType(desc), currentClass)
-                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it, currentClass) }
+                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf(), ::eraseProxyInputType)
                 if (insn.opcode != Opcodes.INVOKESTATIC) {
                     argumentTypes.add(0, OBJECT_TYPE)
                 }
@@ -111,7 +115,7 @@ object DynamicInvoker {
                 if (name != "<init>")
                     return // TODO: plugin types in desc possible?
                 
-                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf()) { fixType(it, currentClass) }
+                val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf(), ::eraseProxyInputType)
                 val newDesc = Type.getMethodDescriptor(OBJECT_TYPE, *argumentTypes.toTypedArray())
                 iter.set(InvokeDynamicInsnNode("ctor" + desc.hashCode().toString(), newDesc, CONSTRUCTOR_PROXY_HANDLE, pluginName, owner, desc))
             }
@@ -128,15 +132,16 @@ object DynamicInvoker {
             return
         
         if (isPluginType && !isPluginOwner) {
-            insn.desc = OBJECT_TYPE.descriptor
+            insn.desc = fieldDesc
             return
         }
         val owner = OBJECT_TYPE.descriptor
+        val inputDesc = eraseProxyInputType(Type.getType(insn.desc)).descriptor
         val newDesc = when (insn.opcode) {
             Opcodes.GETFIELD -> "($owner)$fieldDesc"
-            Opcodes.PUTFIELD -> "($owner$fieldDesc)V"
+            Opcodes.PUTFIELD -> "($owner$inputDesc)V"
             Opcodes.GETSTATIC -> "()$fieldDesc"
-            Opcodes.PUTSTATIC -> "($fieldDesc)V"
+            Opcodes.PUTSTATIC -> "($inputDesc)V"
             else -> throw IllegalStateException("Unexpected field insn opcode ${insn.opcode}")
         }
         
@@ -144,8 +149,7 @@ object DynamicInvoker {
     }
     
     fun visitMultiANewArrayInsn(insn: MultiANewArrayInsnNode, currentClass: String) {
-        if (isPluginClass(insn.desc, currentClass))
-            insn.desc = OBJECT_TYPE.internalName
+        insn.desc = fixType(Type.getType(insn.desc), currentClass).descriptor
     }
     
     fun visitInvokeDynamic(pluginName: String, iter: InsnIterator, insn: InvokeDynamicInsnNode, currentClass: String) {
@@ -155,47 +159,211 @@ object DynamicInvoker {
         
         if (handle.owner == "java/lang/invoke/LambdaMetafactory" && handle.name == "metafactory") {
             val targetMethod = insn.bsmArgs[1] as Handle
+            val interfaceType = insn.bsmArgs[0] as Type
             val originalDynamicDesc = (insn.bsmArgs[2] as Type).descriptor
-            if (targetMethod.owner == currentClass) {
-                insn.bsmArgs[1] = Handle(
-                    targetMethod.tag,
-                    targetMethod.owner,
-                    targetMethod.name,
-                    fixDesc(targetMethod.desc, currentClass),
-                    targetMethod.isInterface
-                )
-                insn.bsmArgs[2] = Type.getType(fixDesc(originalDynamicDesc, currentClass))
-            } else if (isPluginClass(targetMethod.owner, currentClass)) {
-                val interfaceType = insn.bsmArgs[0] as Type
-                val originalDynamicDesc = (insn.bsmArgs[2] as Type).descriptor
+            val fixedFactoryDesc = fixDesc(insn.desc, currentClass)
+            val proxyFactoryDesc = eraseReferenceArguments(fixedFactoryDesc)
+            val fixedInterfaceDesc = fixDesc(interfaceType.descriptor, currentClass)
+            val fixedTargetDesc = fixDesc(targetMethod.desc, currentClass)
+            val fixedDynamicDesc = fixDesc(originalDynamicDesc, currentClass)
+            val targetIsCurrentClass = targetMethod.owner == currentClass
+            val metadataChanged = fixedInterfaceDesc != interfaceType.descriptor
+                || fixedTargetDesc != targetMethod.desc
+                || fixedDynamicDesc != originalDynamicDesc
+            
+            // LambdaMetafactory requires the factory return type to be the actual functional interface.
+            // If that interface belongs to the plugin (for example kotlin.jvm.functions.Function1), the
+            // call site therefore has to go through our proxy: the transformed Minecraft class can only
+            // expose Object in its descriptor, while the proxy restores the interface using the plugin loader.
+            if (targetIsCurrentClass && fixedFactoryDesc != insn.desc) {
                 iter.set(InvokeDynamicInsnNode(
                     insn.name,
-                    fixDesc(insn.desc, currentClass),
+                    proxyFactoryDesc,
+                    LOCAL_METAFACTORY_PROXY_HANDLE,
+                    pluginName,
+                    insn.desc,
+                    interfaceType.descriptor,
+                    Handle(
+                        targetMethod.tag,
+                        targetMethod.owner,
+                        targetMethod.name,
+                        fixedTargetDesc,
+                        targetMethod.isInterface
+                    ),
+                    originalDynamicDesc
+                ))
+            } else if (isPluginClass(targetMethod.owner, currentClass)
+                || fixedFactoryDesc != insn.desc
+                || (!targetIsCurrentClass && metadataChanged)
+            ) {
+                iter.set(InvokeDynamicInsnNode(
+                    insn.name,
+                    proxyFactoryDesc,
                     METAFACTORY_PROXY_HANDLE,
                     pluginName,
                     insn.desc,
-                    interfaceType,
+                    interfaceType.descriptor,
                     targetMethod.owner,
                     targetMethod.name,
                     targetMethod.desc,
                     originalDynamicDesc,
                     targetMethod.tag
                 ))
+            } else if (targetIsCurrentClass) {
+                insn.bsmArgs[1] = Handle(
+                    targetMethod.tag,
+                    targetMethod.owner,
+                    targetMethod.name,
+                    fixedTargetDesc,
+                    targetMethod.isInterface
+                )
+                insn.bsmArgs[0] = Type.getType(fixedInterfaceDesc)
+                insn.bsmArgs[2] = Type.getType(fixedDynamicDesc)
             }
+        } else if (handle.owner == "java/lang/invoke/LambdaMetafactory" && handle.name == "altMetafactory") {
+            visitAltMetafactory(pluginName, iter, insn, currentClass)
         } else if (handle.owner == "java/lang/runtime/SwitchBootstraps") {
-            if (handle.name == "typeSwitch") {
-                val types = insn.bsmArgs.map { (it as Type).internalName }
-                if (types.any { isPluginClass(it, currentClass) }) {
+            if (handle.name == "typeSwitch" || handle.name == "enumSwitch") {
+                val hasPluginLabel = insn.bsmArgs
+                    .filterIsInstance<Type>()
+                    .any { it.sort == Type.OBJECT && isPluginClass(it.internalName, currentClass) }
+                val fixedDesc = fixDesc(insn.desc, currentClass)
+                if (hasPluginLabel || fixedDesc != insn.desc) {
+                    val labels = insn.bsmArgs.map(::encodeSwitchArgument)
                     iter.set(InvokeDynamicInsnNode(
                         insn.name,
-                        fixDesc(insn.desc, currentClass),
+                        fixedDesc,
                         SWITCH_BOOTSTRAPS_PROXY_HANDLE,
                         pluginName,
-                        0,
-                        *types.toTypedArray()
+                        insn.desc,
+                        if (handle.name == "enumSwitch") 1 else 0,
+                        *labels.toTypedArray()
                     ))
                 }
             }
+        } else if (handle.owner == "java/lang/invoke/StringConcatFactory"
+            && (handle.name == "makeConcat" || handle.name == "makeConcatWithConstants")
+        ) {
+            insn.desc = fixDesc(insn.desc, currentClass)
+        }
+    }
+    
+    private fun visitAltMetafactory(
+        pluginName: String,
+        iter: InsnIterator,
+        insn: InvokeDynamicInsnNode,
+        currentClass: String
+    ) {
+        val interfaceType = insn.bsmArgs[0] as Type
+        val targetMethod = insn.bsmArgs[1] as Handle
+        val dynamicType = insn.bsmArgs[2] as Type
+        val flags = insn.bsmArgs[3] as Int
+        val fixedFactoryDesc = fixDesc(insn.desc, currentClass)
+        val proxyFactoryDesc = eraseReferenceArguments(fixedFactoryDesc)
+        val fixedInterfaceDesc = fixDesc(interfaceType.descriptor, currentClass)
+        val fixedTargetDesc = fixDesc(targetMethod.desc, currentClass)
+        val fixedDynamicDesc = fixDesc(dynamicType.descriptor, currentClass)
+        val targetIsCurrentClass = targetMethod.owner == currentClass
+        val optionalMetadataNeedsPluginLoader = insn.bsmArgs.drop(4)
+            .filterIsInstance<Type>()
+            .any { type ->
+                when (type.sort) {
+                    Type.METHOD -> !targetIsCurrentClass
+                        && fixDesc(type.descriptor, currentClass) != type.descriptor
+                    
+                    Type.OBJECT -> isPluginClass(type.internalName, currentClass)
+                    Type.ARRAY -> fixType(type, currentClass) != type
+                    else -> false
+                }
+            }
+        val metadataChanged = fixedInterfaceDesc != interfaceType.descriptor
+            || fixedTargetDesc != targetMethod.desc
+            || fixedDynamicDesc != dynamicType.descriptor
+        
+        if (targetIsCurrentClass && (fixedFactoryDesc != insn.desc || optionalMetadataNeedsPluginLoader)) {
+            val optionalArgs = insn.bsmArgs.drop(4).map(::encodeBootstrapArgument)
+            iter.set(InvokeDynamicInsnNode(
+                insn.name,
+                proxyFactoryDesc,
+                LOCAL_ALT_METAFACTORY_PROXY_HANDLE,
+                pluginName,
+                insn.desc,
+                interfaceType.descriptor,
+                Handle(
+                    targetMethod.tag,
+                    targetMethod.owner,
+                    targetMethod.name,
+                    fixedTargetDesc,
+                    targetMethod.isInterface
+                ),
+                dynamicType.descriptor,
+                flags,
+                *optionalArgs.toTypedArray()
+            ))
+        } else if (isPluginClass(targetMethod.owner, currentClass)
+            || fixedFactoryDesc != insn.desc
+            || optionalMetadataNeedsPluginLoader
+            || (!targetIsCurrentClass && metadataChanged)
+        ) {
+            val optionalArgs = insn.bsmArgs.drop(4).map(::encodeBootstrapArgument)
+            iter.set(InvokeDynamicInsnNode(
+                insn.name,
+                proxyFactoryDesc,
+                ALT_METAFACTORY_PROXY_HANDLE,
+                pluginName,
+                insn.desc,
+                interfaceType.descriptor,
+                targetMethod.owner,
+                targetMethod.name,
+                targetMethod.desc,
+                dynamicType.descriptor,
+                targetMethod.tag,
+                flags,
+                *optionalArgs.toTypedArray()
+            ))
+        } else if (targetIsCurrentClass) {
+            insn.bsmArgs[0] = Type.getMethodType(fixedInterfaceDesc)
+            insn.bsmArgs[1] = Handle(
+                targetMethod.tag,
+                targetMethod.owner,
+                targetMethod.name,
+                fixedTargetDesc,
+                targetMethod.isInterface
+            )
+            insn.bsmArgs[2] = Type.getMethodType(fixedDynamicDesc)
+            for (index in 4 until insn.bsmArgs.size) {
+                val type = insn.bsmArgs[index] as? Type ?: continue
+                if (type.sort == Type.METHOD) {
+                    insn.bsmArgs[index] = Type.getMethodType(fixDesc(type.descriptor, currentClass))
+                }
+            }
+        }
+    }
+    
+    private fun encodeBootstrapArgument(argument: Any): String {
+        return when (argument) {
+            is Type -> when (argument.sort) {
+                Type.METHOD -> "M${argument.descriptor}"
+                Type.OBJECT, Type.ARRAY -> "C${argument.descriptor}"
+                else -> throw IllegalArgumentException("Unsupported bootstrap type argument: $argument")
+            }
+            
+            is String -> "S$argument"
+            is Int -> "I$argument"
+            else -> throw IllegalArgumentException(
+                "Unsupported bootstrap argument ${argument.javaClass.name}: $argument"
+            )
+        }
+    }
+    
+    private fun encodeSwitchArgument(argument: Any): Any {
+        return when (argument) {
+            is Long -> "J$argument"
+            is Float -> "F$argument"
+            is Double -> "D$argument"
+            is Boolean -> "Z$argument"
+            is ConstantDynamic -> argument
+            else -> encodeBootstrapArgument(argument)
         }
     }
     
@@ -204,7 +372,12 @@ object DynamicInvoker {
         if (cst !is Type)
             return
         
-        if (cst.sort != Type.OBJECT || !isPluginClass(cst.internalName, currentClass))
+        val referencedType = when (cst.sort) {
+            Type.OBJECT -> cst
+            Type.ARRAY -> cst.elementType
+            else -> return
+        }
+        if (referencedType.sort != Type.OBJECT || !isPluginClass(referencedType.internalName, currentClass))
             return
         
         // replace ldc with an indy that will resolve the type at runtime
@@ -213,12 +386,13 @@ object DynamicInvoker {
             Type.getMethodDescriptor(CLASS_TYPE),
             CLASS_PROXY_HANDLE,
             pluginName,
-            cst.internalName
+            if (cst.sort == Type.ARRAY) cst.descriptor else cst.internalName
         ))
     }
     
     private fun isPluginClass(internalName: String, currentClass: String): Boolean {
-        return !internalName.startsWith(currentClass) // not current class and not inner class
+        return internalName != currentClass
+            && !internalName.startsWith("$currentClass\$")
             && !internalName.startsWith("org/spongepowered/asm/mixin")
             && !internalName.startsWith("com/llamalad7/mixinextras")
             && OrigamiEnvironment.minecraftClasspath?.getClass(internalName) == null
@@ -244,6 +418,18 @@ object DynamicInvoker {
             
             else -> type
         }
+    }
+
+    private fun eraseProxyInputType(type: Type): Type {
+        // Removing a plugin CHECKCAST leaves Object as the verifier type. Proxy inputs therefore accept
+        // every reference as Object; the original descriptor remains bootstrap metadata for MethodHandle.asType.
+        return if (type.sort == Type.OBJECT || type.sort == Type.ARRAY) OBJECT_TYPE else type
+    }
+
+    private fun eraseReferenceArguments(desc: String): String {
+        val returnType = Type.getReturnType(desc)
+        val argumentTypes = Type.getArgumentTypes(desc).map(::eraseProxyInputType).toTypedArray()
+        return Type.getMethodDescriptor(returnType, *argumentTypes)
     }
     
     private fun fixDesc(desc: String, currentClass: String): String {

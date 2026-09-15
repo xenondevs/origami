@@ -10,4 +10,6 @@ dependencies {
     api(libs.mixinextras)
     api(libs.snakeyaml)
     api(libs.bundles.asm)
+    
+    testImplementation(project(":origami-injectables"))
 }
