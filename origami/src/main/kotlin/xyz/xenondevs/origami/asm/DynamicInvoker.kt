@@ -57,7 +57,8 @@ object DynamicInvoker {
     }
     
     fun visitTypeInsn(pluginName: String, list: InsnList, iter: InsnIterator, insn: TypeInsnNode, currentClass: String) {
-        if (!isPluginClass(insn.desc, currentClass))
+        val fixedType = fixType(Type.getObjectType(insn.desc), currentClass)
+        if (fixedType.internalName == insn.desc)
             return
         
         when (insn.opcode) {
@@ -73,11 +74,14 @@ object DynamicInvoker {
             }
             
             Opcodes.CHECKCAST -> {
-                // All plugin casts are done by method handle layers. The mixin class only knows plugin classes as Objects.
-                iter.remove()
+                if (fixedType == OBJECT_TYPE) {
+                    iter.remove()
+                } else {
+                    insn.desc = fixedType.internalName
+                }
             }
             
-            Opcodes.ANEWARRAY -> insn.desc = OBJECT_TYPE.internalName
+            Opcodes.ANEWARRAY -> insn.desc = fixedType.internalName
             
             Opcodes.INSTANCEOF -> {
                 // Instanceof checks are replaced with a call to Class.isInstance(Object) method handle with the receiver
@@ -116,7 +120,8 @@ object DynamicInvoker {
                     return // TODO: plugin types in desc possible?
                 
                 val argumentTypes = Type.getArgumentTypes(desc).mapTo(mutableListOf(), ::eraseProxyInputType)
-                val newDesc = Type.getMethodDescriptor(OBJECT_TYPE, *argumentTypes.toTypedArray())
+                val returnType = fixType(Type.getObjectType(owner), currentClass)
+                val newDesc = Type.getMethodDescriptor(returnType, *argumentTypes.toTypedArray())
                 iter.set(InvokeDynamicInsnNode("ctor" + desc.hashCode().toString(), newDesc, CONSTRUCTOR_PROXY_HANDLE, pluginName, owner, desc))
             }
             
@@ -401,14 +406,15 @@ object DynamicInvoker {
     private fun fixType(type: Type, currentClass: String): Type {
         return when (type.sort) {
             Type.OBJECT -> {
-                if (isPluginClass(type.internalName, currentClass)) {
-                    // TODO | this could in theory be optimized to instead search for the first superclass that is not a
-                    // TODO | plugin class to support better frame optimizations by the JVM. In turn, this would obviously
-                    // TODO | also require to build a class hierarchy for server and default library classes.
-                    OBJECT_TYPE
-                } else {
-                    type
+                var name = type.internalName
+                val visited = HashSet<String>()
+                while (isPluginClass(name, currentClass)) {
+                    if (!visited.add(name))
+                        return OBJECT_TYPE
+                    name = OrigamiEnvironment.pluginLoader?.pluginClasspath?.getClass(name)?.superName
+                        ?: return OBJECT_TYPE
                 }
+                Type.getObjectType(name)
             }
             
             Type.ARRAY -> {
