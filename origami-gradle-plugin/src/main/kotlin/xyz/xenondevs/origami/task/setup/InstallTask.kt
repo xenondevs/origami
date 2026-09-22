@@ -26,6 +26,17 @@ import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectories
 import kotlin.io.path.outputStream
 
+private val EMPTY_ZIP = byteArrayOf(
+    0x50, 0x4B, 0x05, 0x06,
+    0x00, 0x00,
+    0x00, 0x00,
+    0x00, 0x00,
+    0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00
+)
+
 internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
     
     @get:Input
@@ -50,7 +61,10 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
     
     @TaskAction
     fun run() {
-        markerFile.orNull?.asFile?.createNewFile()
+        markerFile.orNull?.asFile?.also { file ->
+            file.parentFile.mkdirs()
+            file.writeBytes(EMPTY_ZIP)
+        }
         install()
     }
     
