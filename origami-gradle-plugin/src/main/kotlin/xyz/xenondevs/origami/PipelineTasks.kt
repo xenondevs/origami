@@ -4,6 +4,7 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
+import org.gradle.api.attributes.Category
 import org.gradle.api.file.Directory
 import org.gradle.api.file.RegularFile
 import org.gradle.api.plugins.JavaPluginExtension
@@ -89,16 +90,25 @@ internal fun Project.registerTasks(plugin: OrigamiPlugin, configs: OrigamiConfig
     
     val installPom = tasks.register<InstallTask.Pom>("_oriInstallPom") {
         configureCommon()
-        serverDependencies.set(
-            configs.devBundleCompileClasspath.map { cfg ->
-                cfg.incoming.resolutionResult.root.dependencies
-                    .filterIsInstance<ResolvedDependencyResult>()
-                    .single().selected.dependencies
-                    .filterIsInstance<ResolvedDependencyResult>()
-                    .mapNotNull { it.selected.id as? ModuleComponentIdentifier }
-                    .map { "${it.group}:${it.module}:${it.version}" }
-            }
-        )
+        val dependencies = configs.devBundleCompileClasspath.map { cfg ->
+            cfg.incoming.resolutionResult.root.dependencies
+                .filterIsInstance<ResolvedDependencyResult>()
+                .single().selected.dependencies
+                .filterIsInstance<ResolvedDependencyResult>()
+                .filterNot { it.isConstraint }
+                .mapNotNull { dependency ->
+                    val id = dependency.selected.id as? ModuleComponentIdentifier ?: return@mapNotNull null
+                    val category = dependency.resolvedVariant.attributes.getAttribute(Category.CATEGORY_ATTRIBUTE)?.name
+                    val isPlatform = category == Category.REGULAR_PLATFORM || category == Category.ENFORCED_PLATFORM
+                    isPlatform to "${id.group}:${id.module}:${id.version}"
+                }
+        }
+        serverDependencies.set(dependencies.map { deps ->
+            deps.filterNot { (isPlatform, _) -> isPlatform }.map { (_, coordinates) -> coordinates }
+        })
+        serverPlatforms.set(dependencies.map { deps ->
+            deps.filter { (isPlatform, _) -> isPlatform }.map { (_, coordinates) -> coordinates }
+        })
     }
     
     val vanillaDownloads = tasks.register<VanillaDownloadTask>("_oriVanillaDownload") {

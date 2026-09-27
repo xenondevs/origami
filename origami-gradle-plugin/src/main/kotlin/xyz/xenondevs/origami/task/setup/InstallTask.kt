@@ -14,9 +14,7 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import org.gradle.kotlin.dsl.listProperty
 import org.gradle.kotlin.dsl.property
-import xyz.xenondevs.origami.util.asPath
 import xyz.xenondevs.origami.util.getAsPath
-import java.io.File
 import java.nio.file.Path
 import javax.inject.Inject
 import javax.xml.XMLConstants
@@ -110,6 +108,9 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
         @get:Input
         val serverDependencies: ListProperty<String> = objects.listProperty()
         
+        @get:Input
+        val serverPlatforms: ListProperty<String> = objects.listProperty<String>().convention(emptyList())
+        
         @get:OutputFile
         override val target: RegularFileProperty = objects.fileProperty()
             .convention(
@@ -123,7 +124,7 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
             )
         
         override fun install() {
-            installPom(group.get(), name.get(), version.get(), target.getAsPath(), serverDependencies.get())
+            installPom(group.get(), name.get(), version.get(), target.getAsPath(), serverDependencies.get(), serverPlatforms.get())
         }
         
         private fun installPom(
@@ -131,7 +132,8 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
             name: String,
             version: String,
             pom: Path,
-            dependencies: List<String>
+            dependencies: List<String>,
+            platforms: List<String>
         ) {
             pom.parent.createDirectories()
             pom.outputStream().buffered().use { out ->
@@ -146,6 +148,21 @@ internal abstract class InstallTask(objects: ObjectFactory) : DefaultTask() {
                 
                 writer.writeElement("modelVersion", "4.0.0")
                 writer.writeCoordinates(group, name, version)
+                
+                if (platforms.isNotEmpty()) {
+                    writer.writeStartElement("dependencyManagement")
+                    writer.writeStartElement("dependencies")
+                    for (platform in platforms) {
+                        val (platformGroup, module, platformVersion) = platform.split(':', limit = 3)
+                        writer.writeStartElement("dependency")
+                        writer.writeCoordinates(platformGroup, module, platformVersion)
+                        writer.writeElement("type", "pom")
+                        writer.writeElement("scope", "import")
+                        writer.writeEndElement()
+                    }
+                    writer.writeEndElement()
+                    writer.writeEndElement()
+                }
                 
                 writer.writeStartElement("dependencies")
                 for (dep in dependencies) {
