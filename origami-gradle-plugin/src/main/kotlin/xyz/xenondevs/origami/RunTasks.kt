@@ -2,7 +2,6 @@ package xyz.xenondevs.origami
 
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.getByName
-import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.newInstance
 import org.gradle.kotlin.dsl.register
 import xyz.xenondevs.origami.extension.OrigamiExtension
@@ -10,26 +9,22 @@ import xyz.xenondevs.origami.task.run.ExtractPatchInputs
 import xyz.xenondevs.origami.task.run.GenerateAotCacheFingerprint
 import xyz.xenondevs.origami.task.run.PatchRunServerJar
 import xyz.xenondevs.origami.task.run.RunServer
-import xyz.xenondevs.origami.task.setup.ApplyBinDiffTask
+import xyz.xenondevs.origami.util.singleRegularFile
 import xyz.xenondevs.origami.value.ListArgumentProvider
 
 internal fun Project.registerRunTasks(plugin: OrigamiPlugin, configs: OrigamiConfigurations) {
     val ext = extensions.getByName<OrigamiExtension>(ORIGAMI_EXTENSION).runServer
-    val applyBinDiff = tasks.named<ApplyBinDiffTask>("_oriApplyBinDiff")
-    
     val extractPatchInputs = tasks.register<ExtractPatchInputs>("_oriPrepareMixins") {
         plugins.from(ext.plugins)
         outputDir.set(layout.buildDirectory.dir("origami/patch-fingerprint"))
     }
     
     val patchRunServerJar = tasks.register<PatchRunServerJar>("_oriMixin") {
-        dependsOn(applyBinDiff)
-
         javaLauncher.set(plugin.javaLauncherFor(project))
         setClasspath(configs.aotPatcher)
         
-        serverJar.set(applyBinDiff.flatMap(ApplyBinDiffTask::patchedJar))
-        outputJar.set(layout.buildDirectory.file("origami/paper-server-patched.jar"))
+        serverJar.set(configs.widenedServer.singleRegularFile(layout))
+        outputJar.set(layout.buildDirectory.file("origami/paper-server-mixin-patched.jar"))
         plugins.from(ext.plugins)
         patchFingerprint.set(extractPatchInputs.flatMap { it.outputDir })
         serverClasspath.from(configs.devBundleCompileClasspath)

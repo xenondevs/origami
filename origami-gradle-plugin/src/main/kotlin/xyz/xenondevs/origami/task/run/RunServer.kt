@@ -9,6 +9,7 @@ import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.work.DisableCachingByDefault
 import java.net.URI
 import java.nio.file.Path
 import java.nio.file.attribute.FileTime
@@ -23,6 +24,7 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.outputStream
 import kotlin.io.path.setLastModifiedTime
 
+@DisableCachingByDefault
 internal abstract class RunServer : JavaExec() {
     
     @get:Internal

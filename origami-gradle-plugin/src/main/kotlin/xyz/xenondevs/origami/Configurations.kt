@@ -3,12 +3,17 @@ package xyz.xenondevs.origami
 import org.gradle.api.Named
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
+import org.gradle.api.artifacts.Dependency
+import org.gradle.api.artifacts.type.ArtifactTypeDefinition
 import org.gradle.api.attributes.Attribute
+import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.Usage
 import org.gradle.api.provider.Provider
 import org.gradle.kotlin.dsl.maven
 import org.gradle.kotlin.dsl.named
 import org.gradle.kotlin.dsl.repositories
+import xyz.xenondevs.origami.transform.ORIGAMI_CLASSPATH_ARTIFACT_TYPE
+import xyz.xenondevs.origami.transform.ORIGAMI_SETUP_INPUT
 import xyz.xenondevs.origami.value.DevBundle
 import xyz.xenondevs.origami.value.MacheConfig
 import xyz.xenondevs.origami.value.MacheDependencies
@@ -19,13 +24,13 @@ internal class OrigamiConfigurations(private val project: Project) {
     private val configurations = project.configurations
     private val dependencyFactory = project.dependencies
     
-    val devBundle = configurations.register("paperweightDevelopmentBundle") {
+    val devBundle = configurations.detachedConfiguration().apply {
         attributes.attribute(
             Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
             project.objects.named("zip")
         )
     }
-    val devBundleCompileClasspath = configurations.register("paperweightDevelopmentBundleCompileClasspath") {
+    val devBundleCompileClasspath = configurations.detachedConfiguration().apply {
         attributes {
             attribute(
                 Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
@@ -34,13 +39,22 @@ internal class OrigamiConfigurations(private val project: Project) {
             attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage.JAVA_API))
         }
     }
-    val devBundleRuntimeClasspath = configurations.register("paperweightDevelopmentBundleRuntimeClasspath") {
+    val devBundleRuntimeClasspath = configurations.detachedConfiguration().apply {
         attributes {
             attribute(
                 Attribute.of("io.papermc.paperweight.dev-bundle-output", Named::class.java),
                 project.objects.named("serverDependencies")
             )
             attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage.JAVA_RUNTIME))
+        }
+    }
+    val widenedServer = configurations.detachedConfiguration().apply {
+        isTransitive = false
+        attributes {
+            attribute(Usage.USAGE_ATTRIBUTE, project.objects.named(Usage.JAVA_API))
+            attribute(Category.CATEGORY_ATTRIBUTE, project.objects.named(Category.LIBRARY))
+            attribute(ORIGAMI_SETUP_INPUT, true)
+            attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, ORIGAMI_CLASSPATH_ARTIFACT_TYPE)
         }
     }
     
@@ -65,6 +79,13 @@ internal class OrigamiConfigurations(private val project: Project) {
     
     init {
         configureRepositories()
+    }
+    
+    fun configureDevBundle(dependency: Provider<Dependency>) {
+        devBundle.dependencies.addLater(dependency)
+        devBundleCompileClasspath.dependencies.addLater(dependency)
+        devBundleRuntimeClasspath.dependencies.addLater(dependency)
+        widenedServer.dependencies.addLater(dependency)
     }
     
     fun configureMache(devBundleInfo: Provider<DevBundle>, macheConfig: Provider<MacheConfig>) {
@@ -129,6 +150,8 @@ internal class OrigamiConfigurations(private val project: Project) {
                 onlyForConfigurations(
                     devBundle.name,
                     devBundleCompileClasspath.name,
+                    devBundleRuntimeClasspath.name,
+                    widenedServer.name,
                     mache.name,
                     aotPlugin.name
                 )

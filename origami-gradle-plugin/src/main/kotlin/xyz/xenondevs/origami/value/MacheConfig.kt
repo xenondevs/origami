@@ -8,7 +8,7 @@ import xyz.xenondevs.origami.util.GSON
 import java.nio.file.FileSystems
 import kotlin.io.path.reader
 
-data class MacheConfig(
+internal data class MacheConfig(
     val minecraftVersion: String,
     val includesClientPatches: Boolean,
     val macheVersion: String,
@@ -18,7 +18,7 @@ data class MacheConfig(
     val remapperArgs: List<String>,
 )
 
-data class MacheDependencies(
+internal data class MacheDependencies(
     val codebook: List<MavenArtifact>,
     val paramMappings: List<MavenArtifact>?,
     val constants: List<MavenArtifact>,
@@ -26,7 +26,7 @@ data class MacheDependencies(
     val decompiler: List<MavenArtifact>,
 )
 
-abstract class MacheConfigValueSource: ValueSource<MacheConfig, MacheConfigValueSource.Parameters> {
+internal abstract class MacheConfigValueSource : ValueSource<MacheConfig, MacheConfigValueSource.Parameters> {
     
     interface Parameters : ValueSourceParameters {
         @get:InputFile
@@ -41,5 +41,5 @@ abstract class MacheConfigValueSource: ValueSource<MacheConfig, MacheConfigValue
             }
         }
     }
-
+    
 }

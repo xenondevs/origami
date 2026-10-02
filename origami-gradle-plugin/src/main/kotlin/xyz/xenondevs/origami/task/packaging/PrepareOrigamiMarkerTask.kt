@@ -11,7 +11,7 @@ import org.gradle.api.tasks.TaskAction
 import javax.inject.Inject
 
 @CacheableTask
-abstract class PrepareOrigamiMarkerTask @Inject constructor()  : DefaultTask() {
+internal abstract class PrepareOrigamiMarkerTask @Inject constructor() : DefaultTask() {
     
     @get:Input
     abstract val origamiVersion: Property<String>

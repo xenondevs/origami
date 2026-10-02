@@ -30,19 +30,34 @@ abstract class OrigamiExtension @Inject constructor(
     layout: ProjectLayout
 ) {
     
+    @Deprecated("Setup artifacts are stored in Gradle's artifact transform cache")
     val cache: DirectoryProperty = objects.directoryProperty()
         .convention(layout.projectDirectory.dir(".gradle/caches/origami"))
     
+    /**
+     * The system-wide cache for project-independent server setup artifacts.
+     */
     val sharedCache: DirectoryProperty = objects.directoryProperty()
-        .convention(layout.dir(project.provider { gradle.gradleUserHomeDir.resolve("caches/origami/0/") })) // increment number when cache structure changes
+        .convention(layout.dir(project.provider { gradle.gradleUserHomeDir.resolve("caches/origami") }))
     
     @Deprecated("pluginId is unused")
     val pluginId: Property<String> = objects.property<String>()
     
+    /**
+     * The group of the dev-bundle. Default: `io.papermc.paper`.
+     */
     val devBundleGroup: Property<String> = objects.property<String>()
         .convention("io.papermc.paper")
+    
+    /**
+     * The name of the dev-bundle. Default: `dev-bundle`.
+     */
     val devBundleArtifact: Property<String> = objects.property<String>()
         .convention("dev-bundle")
+    
+    /**
+     * The version of the dev-bundle. No default.
+     */
     val devBundleVersion: Property<String> = objects.property<String>()
     
     /**
@@ -51,7 +66,6 @@ abstract class OrigamiExtension @Inject constructor(
      * Defaults to none.
      */
     val transitiveAccessWidenerSources: ConfigurableFileCollection = objects.fileCollection()
-    val runServer: RunServerExtension = objects.newInstance()
     
     /**
      * The [CopySpec] to merge into `origamiJar`.
@@ -92,6 +106,14 @@ abstract class OrigamiExtension @Inject constructor(
         devBundleVersion.set(version)
     }
     
+    /**
+     * The [RunServerExtension].
+     */
+    val runServer: RunServerExtension = objects.newInstance()
+    
+    /**
+     * Configures [RunServerExtension]
+     */
     fun runServer(configure: Action<in RunServerExtension>) {
         configure.execute(runServer)
     }
@@ -106,10 +128,10 @@ abstract class OrigamiExtension @Inject constructor(
         
         /**
          * The plugins to load.
-         * 
+         *
          * All plugins that use origami must be in this collection, otherwise
          * their mixins and access wideners won't be applied.
-         * 
+         *
          * Plugins that don't use origami can also just be in the `plugins/` directory.
          */
         val plugins: ConfigurableFileCollection = objects.fileCollection()

@@ -1,4 +1,4 @@
-package xyz.xenondevs.origami.task.setup
+package xyz.xenondevs.origami.transform.action
 
 import com.github.javaparser.JavaParser
 import com.github.javaparser.ParserConfiguration
@@ -29,56 +29,123 @@ import net.fabricmc.accesswidener.AccessWidenerClassVisitor
 import net.fabricmc.accesswidener.AccessWidenerReader
 import net.fabricmc.accesswidener.ForwardingVisitor
 import net.fabricmc.accesswidener.TransitiveOnlyFilter
-import org.gradle.api.DefaultTask
+import org.gradle.api.artifacts.transform.CacheableTransform
+import org.gradle.api.artifacts.transform.InputArtifact
+import org.gradle.api.artifacts.transform.TransformAction
+import org.gradle.api.artifacts.transform.TransformOutputs
+import org.gradle.api.artifacts.transform.TransformParameters
 import org.gradle.api.file.ConfigurableFileCollection
-import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.tasks.CacheableTask
+import org.gradle.api.file.FileSystemLocation
+import org.gradle.api.logging.Logger
+import org.gradle.api.logging.Logging
+import org.gradle.api.provider.Property
+import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
-import org.gradle.api.tasks.InputDirectory
-import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
-import org.gradle.api.tasks.Optional
-import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
-import org.gradle.api.tasks.TaskAction
 import org.objectweb.asm.ClassReader
 import org.objectweb.asm.ClassWriter
 import org.objectweb.asm.Opcodes
 import xyz.xenondevs.origami.AccessWidenerConfig
 import xyz.xenondevs.origami.AccessWidenerConfig.ClassMember
 import xyz.xenondevs.origami.ProjectAccessWidener
+import java.io.File
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import kotlin.time.measureTime
 
-// TODO: include craftbukkit sources
-@CacheableTask
-internal abstract class WidenTask : DefaultTask() {
+internal interface WidenTransformParameters : TransformParameters {
+    
+    @get:Input
+    val devBundleId: Property<String>
     
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.NONE)
-    abstract val accessWideners: ConfigurableFileCollection
+    val accessWideners: ConfigurableFileCollection
     
     @get:InputFiles
     @get:Classpath
-    abstract val transitiveAccessWidenerSources: ConfigurableFileCollection
+    val transitiveAccessWidenerSources: ConfigurableFileCollection
     
-    @get:InputFile
-    @get:PathSensitive(PathSensitivity.NONE)
-    abstract val input: RegularFileProperty
+}
+
+/**
+ * Produces the server JAR used by the current project.
+ *
+ * It takes the shared patched server and applies access wideners from the project and its dependencies. This final
+ * output is project-specific, unlike the cached server prepared by [PrepareServerTransform].
+ */
+@CacheableTransform
+internal abstract class WidenBinaryTransform : TransformAction<WidenTransformParameters> {
     
-    @get:OutputFile
-    abstract val output: RegularFileProperty
+    @get:InputArtifact
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val inputArtifact: Provider<FileSystemLocation>
     
-    @TaskAction
-    fun run() {
+    override fun transform(outputs: TransformOutputs) {
+        val base = inputArtifact.get().asFile
+        val logger = Logging.getLogger(WidenBinaryTransform::class.java)
+        logger.lifecycle("[Origami] Preparing widened Paper server for ${parameters.devBundleId.get()}")
+        Widening.Jar(
+            parameters.accessWideners,
+            parameters.transitiveAccessWidenerSources,
+            logger
+        ).run(base.resolve(PrepareServerTransform.PATCHED_SERVER_FILE), outputs.file("server-widened.jar"))
+        logger.lifecycle("[Origami] Prepared widened Paper server for ${parameters.devBundleId.get()}")
+    }
+    
+}
+
+/**
+ * Produces server sources whose access modifiers match the widened server JAR.
+ *
+ * It applies the same project and dependency access wideners to the shared patched sources, so navigation and
+ * completion in the IDE reflect the classes that the project actually compiles against.
+ */
+@CacheableTransform
+internal abstract class WidenSourcesTransform : TransformAction<WidenTransformParameters> {
+    
+    @get:InputArtifact
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val inputArtifact: Provider<FileSystemLocation>
+    
+    override fun transform(outputs: TransformOutputs) {
+        val base = inputArtifact.get().asFile
+        val logger = Logging.getLogger(WidenSourcesTransform::class.java)
+        logger.lifecycle("[Origami] Preparing widened Paper sources for ${parameters.devBundleId.get()}")
+        Widening.SourcesJar(
+            parameters.accessWideners,
+            parameters.transitiveAccessWidenerSources,
+            logger,
+            base.resolve(PrepareSourcesTransformAction.LIBRARIES_DIR),
+            base.resolve(PrepareSourcesTransformAction.NEW_SOURCES_DIR),
+            base.resolve(PrepareSourcesTransformAction.PATCHED_SOURCES_DIR),
+        ).run(base.resolve(PrepareSourcesTransformAction.PATCHED_SOURCES_FILE), outputs.file("server-widened-sources.jar"))
+        logger.lifecycle("[Origami] Prepared widened Paper sources for ${parameters.devBundleId.get()}")
+    }
+    
+}
+
+// TODO: include craftbukkit sources
+/**
+ * Reads the access wideners supplied by the current project and its dependencies, then applies their requested access
+ * changes to either compiled classes or Java sources.
+ */
+internal abstract class Widening(
+    private val accessWideners: Iterable<File>,
+    private val transitiveAccessWidenerSources: Iterable<File>,
+    protected val logger: Logger,
+) {
+    
+    fun run(input: File, output: File) {
         val aw = parseAccessWidener()
+        output.parentFile.mkdirs()
         
-        val inp = ZipInputStream(input.get().asFile.inputStream().buffered())
-        val out = ZipOutputStream(output.get().asFile.outputStream().buffered())
+        val inp = ZipInputStream(input.inputStream().buffered())
+        val out = ZipOutputStream(output.outputStream().buffered())
         
         try {
             if (!aw.isEmpty()) {
@@ -98,7 +165,7 @@ internal abstract class WidenTask : DefaultTask() {
         val accessWidener = AccessWidener()
         val config = AccessWidenerConfig()
         
-        val accessWideners = accessWideners.files
+        val accessWideners = accessWideners.toSet()
         if (accessWideners.isNotEmpty()) {
             for (projectAw in accessWideners) {
                 logger.info("Using project access wideners from ${projectAw.name}")
@@ -132,7 +199,14 @@ internal abstract class WidenTask : DefaultTask() {
     
     abstract fun copy(inp: ZipInputStream, out: ZipOutputStream)
     
-    abstract class Jar : WidenTask() {
+    /**
+     * Rewrites access flags in the compiled server classes and copies all other JAR entries unchanged.
+     */
+    class Jar(
+        accessWideners: Iterable<File>,
+        transitiveAccessWidenerSources: Iterable<File>,
+        logger: Logger,
+    ) : Widening(accessWideners, transitiveAccessWidenerSources, logger) {
         
         override fun process(aw: ProjectAccessWidener, inp: ZipInputStream, out: ZipOutputStream) {
             generateSequence(inp::getNextEntry).forEach { entry ->
@@ -156,27 +230,25 @@ internal abstract class WidenTask : DefaultTask() {
         
     }
     
-    abstract class SourcesJar : WidenTask() {
-        
-        @get:InputDirectory
-        @get:PathSensitive(PathSensitivity.NONE)
-        abstract val librariesDir: DirectoryProperty
-        
-        @get:InputDirectory
-        @get:PathSensitive(PathSensitivity.NONE)
-        abstract val newSourcesDir: DirectoryProperty
-        
-        @get:InputDirectory
-        @get:PathSensitive(PathSensitivity.NONE)
-        abstract val patchedSourcesDir: DirectoryProperty
+    /**
+     * Updates access modifiers in Java sources so the source JAR describes the same public API as the widened classes.
+     */
+    class SourcesJar(
+        accessWideners: Iterable<File>,
+        transitiveAccessWidenerSources: Iterable<File>,
+        logger: Logger,
+        private val librariesDir: File,
+        private val newSourcesDir: File,
+        private val patchedSourcesDir: File,
+    ) : Widening(accessWideners, transitiveAccessWidenerSources, logger) {
         
         override fun process(
             aw: ProjectAccessWidener,
             inp: ZipInputStream,
             out: ZipOutputStream
         ) {
-            val libraries = librariesDir.get().asFile.walkTopDown().filter { it.isFile && it.extension == "jar" }.toList()
-            val sourcesFolders = listOf(newSourcesDir.get().asFile, patchedSourcesDir.get().asFile)
+            val libraries = librariesDir.walkTopDown().filter { it.isFile && it.extension == "jar" }.toList()
+            val sourcesFolders = listOf(newSourcesDir, patchedSourcesDir)
             
             // fixes file handles to vanilla libraries not being closed
             ClassPool.cacheOpenedJarFile = false

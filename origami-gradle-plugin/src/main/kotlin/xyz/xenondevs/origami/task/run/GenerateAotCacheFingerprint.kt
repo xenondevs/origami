@@ -4,6 +4,8 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
@@ -12,13 +14,11 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
-import org.gradle.api.provider.ListProperty
-import org.gradle.api.provider.Property
 import org.gradle.work.DisableCachingByDefault
 import java.io.File
 import java.nio.ByteBuffer
 import java.security.MessageDigest
-import java.util.HexFormat
+import java.util.*
 
 @DisableCachingByDefault(because = "The fingerprint intentionally includes absolute AOT classpath locations")
 internal abstract class GenerateAotCacheFingerprint : DefaultTask() {
@@ -117,6 +117,7 @@ private fun calculateAotCacheFingerprint(
                 update(file.length())
                 update(file.lastModified())
             }
+            
             else -> error("Unsupported AOT cache fingerprint input: ${file.absolutePath}")
         }
     }

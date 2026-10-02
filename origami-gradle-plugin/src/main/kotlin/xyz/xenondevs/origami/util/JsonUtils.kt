@@ -8,9 +8,9 @@ import com.google.gson.JsonElement
 import java.lang.reflect.Type
 import java.nio.file.Path
 
-val GSON: Gson = GsonBuilder().registerTypeAdapter(Path::class.java, PathDeserializer()).create()
+internal val GSON: Gson = GsonBuilder().registerTypeAdapter(Path::class.java, PathDeserializer()).create()
 
-class PathDeserializer : JsonDeserializer<Path?> {
+internal class PathDeserializer : JsonDeserializer<Path?> {
     override fun deserialize(json: JsonElement?, typeOfT: Type?, context: JsonDeserializationContext?): Path? {
         return json?.asString?.let { Path.of(it) }
     }

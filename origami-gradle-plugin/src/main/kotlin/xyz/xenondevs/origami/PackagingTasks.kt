@@ -34,12 +34,12 @@ internal fun Project.registerPackagingTasks(configs: OrigamiConfigurations) {
         injectablesConfig.from(configs.jitInjectables)
         origamiLoaderConfig.from(configs.jitLoader)
         librariesDirectory.set(ext.librariesDirectory)
-        outputDir.set(ext.cache.dir("loader-files"))
+        outputDir.set(layout.buildDirectory.dir("origami/loader-files"))
     }
     
     val prepareMarker = tasks.register<PrepareOrigamiMarkerTask>("_oriPrepareMarker") {
         origamiVersion.set(OrigamiPlugin.version)
-        jsonOutput.set(ext.cache.file("origami.json"))
+        jsonOutput.set(layout.buildDirectory.file("origami/origami.json"))
     }
     
     tasks.register<Jar>("origamiJar") {

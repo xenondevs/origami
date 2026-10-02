@@ -2,10 +2,8 @@ package xyz.xenondevs.origami.task.run
 
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
-import org.gradle.api.file.ProjectLayout
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.Classpath
-import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
@@ -14,12 +12,16 @@ import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
-import java.nio.file.Files
+import org.gradle.work.DisableCachingByDefault
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.StandardCopyOption
-import javax.inject.Inject
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.createParentDirectories
+import kotlin.io.path.createTempFile
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.moveTo
 
+@DisableCachingByDefault
 internal abstract class PatchRunServerJar : JavaExec() {
     
     @get:InputFile
@@ -30,6 +32,7 @@ internal abstract class PatchRunServerJar : JavaExec() {
     abstract val plugins: ConfigurableFileCollection
     
     @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val patchFingerprint: DirectoryProperty // purely for up-to-date checking
     
     @get:Classpath
@@ -49,7 +52,7 @@ internal abstract class PatchRunServerJar : JavaExec() {
         val output = outputJar.get().asFile.toPath()
         output.createParentDirectories()
         
-        val tmpOut = Files.createTempFile(temporaryDir.toPath(), ".patch-run-server.", ".jar")
+        val tmpOut = createTempFile(temporaryDir.toPath(), ".patch-run-server.", ".jar")
         try {
             setArgs(
                 listOf(
@@ -62,9 +65,13 @@ internal abstract class PatchRunServerJar : JavaExec() {
             
             super.exec()
             
-            Files.move(tmpOut, output, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            try {
+                tmpOut.moveTo(output, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: AtomicMoveNotSupportedException) {
+                tmpOut.moveTo(output, overwrite = true)
+            }
         } finally {
-            Files.deleteIfExists(tmpOut)
+            tmpOut.deleteIfExists()
         }
     }
     

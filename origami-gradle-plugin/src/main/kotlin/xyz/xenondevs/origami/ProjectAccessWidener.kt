@@ -9,7 +9,7 @@ import net.fabricmc.accesswidener.AccessWidener
 import net.fabricmc.accesswidener.AccessWidenerReader.AccessType
 import net.fabricmc.accesswidener.AccessWidenerVisitor
 
-data class ProjectAccessWidener(
+internal data class ProjectAccessWidener(
     val config: AccessWidenerConfig,
     val accessWidener: AccessWidener
 ) {
@@ -39,7 +39,7 @@ private fun MutableSet<Modifier.Keyword>.setVisibility(to: Modifier.Keyword) {
     add(to)
 }
 
-class AccessWidenerConfig : AccessWidenerVisitor {
+internal class AccessWidenerConfig : AccessWidenerVisitor {
     
     val classes = HashMap<String, AccessChange>()
     val fields = HashMap<ClassMember, AccessChange>()

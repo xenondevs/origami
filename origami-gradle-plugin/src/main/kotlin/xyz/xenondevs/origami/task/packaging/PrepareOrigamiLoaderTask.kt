@@ -1,9 +1,6 @@
 package xyz.xenondevs.origami.task.packaging
 
 import org.gradle.api.DefaultTask
-import org.gradle.api.artifacts.Configuration
-import org.gradle.api.artifacts.component.ModuleComponentIdentifier
-import org.gradle.api.artifacts.result.ResolvedArtifactResult
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.MapProperty
@@ -17,7 +14,7 @@ import java.io.File
 import java.util.zip.ZipInputStream
 
 @CacheableTask
-abstract class PrepareOrigamiLoaderTask : DefaultTask() {
+internal abstract class PrepareOrigamiLoaderTask : DefaultTask() {
     
     @get:Classpath
     abstract val origamiLoaderConfig: ConfigurableFileCollection
@@ -30,7 +27,7 @@ abstract class PrepareOrigamiLoaderTask : DefaultTask() {
     
     @get:Input
     abstract val libraryPaths: MapProperty<String, String>
-        
+    
     @get:Input
     abstract val librariesDirectory: Property<String>
     
