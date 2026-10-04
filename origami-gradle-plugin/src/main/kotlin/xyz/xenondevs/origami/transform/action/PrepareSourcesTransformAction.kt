@@ -110,7 +110,7 @@ internal abstract class PrepareSourcesTransformAction : TransformAction<PrepareS
         val bundle = base.resolve(PrepareServerTransform.DEV_BUNDLE_FILE)
         val cache = SharedTransformCache(
             parameters.sharedCache.get().asFile,
-            parameters.devBundleId.get().substringAfterLast(':'),
+            parameters.devBundleId.get(),
             "sources-base",
         )
         

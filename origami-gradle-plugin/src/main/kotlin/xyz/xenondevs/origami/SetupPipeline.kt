@@ -23,8 +23,8 @@ import xyz.xenondevs.origami.transform.action.PrepareSourcesTransformAction
 import xyz.xenondevs.origami.transform.action.PreserveClasspathArtifactTransformAction
 import xyz.xenondevs.origami.transform.action.WidenBinaryTransform
 import xyz.xenondevs.origami.transform.action.WidenSourcesTransform
+import xyz.xenondevs.origami.util.singleFileProvider
 import xyz.xenondevs.origami.util.singleModuleCoordinates
-import xyz.xenondevs.origami.util.singleRegularFile
 import xyz.xenondevs.origami.value.DevBundleValueSource
 import xyz.xenondevs.origami.value.MacheConfigValueSource
 
@@ -103,13 +103,13 @@ private fun Project.registerTransforms(
     ext: OrigamiExtension,
 ) {
     //<editor-fold desc="shared inputs">
-    val macheZip = cfgs.mache.singleRegularFile(layout)
+    val macheZip = cfgs.mache.singleFileProvider()
     val macheConfig = providers.of(MacheConfigValueSource::class.java) {
-        parameters.zip.set(macheZip)
+        parameters.zip.fileProvider(macheZip)
     }
     cfgs.configureMache(
         providers.of(DevBundleValueSource::class.java) {
-            parameters.zip.set(cfgs.devBundle.singleRegularFile(layout))
+            parameters.zip.fileProvider(cfgs.devBundle.singleFileProvider())
         },
         macheConfig
     )
@@ -175,12 +175,12 @@ private fun Project.registerTransforms(
             this.devBundleId.set(devBundleId)
             this.javaExecutable.set(javaExecutable)
             this.sharedCache.set(ext.sharedCache)
-            this.macheFile.set(macheZip)
-            this.codebook.set(cfgs.codebook.singleRegularFile(layout))
-            this.paramMappings.set(cfgs.paramMappings.singleRegularFile(layout, optional = true))
-            this.constants.set(cfgs.constants.singleRegularFile(layout, optional = true))
-            this.remapper.set(cfgs.remapper.singleRegularFile(layout, optional = true))
-            this.decompiler.set(cfgs.decompiler.singleRegularFile(layout))
+            this.macheFile.fileProvider(macheZip)
+            this.codebook.fileProvider(cfgs.codebook.singleFileProvider())
+            this.paramMappings.fileProvider(cfgs.paramMappings.singleFileProvider(optional = true))
+            this.constants.fileProvider(cfgs.constants.singleFileProvider(optional = true))
+            this.remapper.fileProvider(cfgs.remapper.singleFileProvider(optional = true))
+            this.decompiler.fileProvider(cfgs.decompiler.singleFileProvider())
             this.remapperArgs.set(macheConfig.map { it.remapperArgs })
             this.decompilerArgs.set(macheConfig.map { it.decompilerArgs })
         }

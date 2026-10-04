@@ -8,25 +8,21 @@ import java.nio.file.StandardOpenOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
-import kotlin.io.path.copyTo
 import kotlin.io.path.moveTo
 
+private const val CACHE_VERSION = 1
 private val LOCAL_LOCKS = ConcurrentHashMap<String, ReentrantLock>()
 
 /**
- * Reuses expensive setup results across unrelated Gradle projects.
- *
- * Each dev-bundle version has separate entries for the patched server and patched sources. A file lock ensures that
- * only one build creates an entry, after which its files are copied into the output directory Gradle assigned to the
- * current transform.
+ * Reuses expensive dev bundle setup results across unrelated Gradle projects.
  */
 internal class SharedTransformCache(
-    root: File,
-    devBundleVersion: String,
+    cacheRoot: File,
+    devBundleId: String,
     private val outputName: String,
 ) {
     
-    private val versionDirectory = root.resolve(devBundleVersion.toCachePathSegment())
+    private val versionDirectory = cacheRoot.resolve("v$CACHE_VERSION/${devBundleId.replace(':', '/')}")
     private val entry = versionDirectory.resolve(outputName)
     private val lockFile = versionDirectory.resolve("$outputName.lock")
     
@@ -49,21 +45,21 @@ internal class SharedTransformCache(
                         return@withLock true
                     }
                     
-                    val staging = versionDirectory.resolve("$outputName.tmp")
-                    if (staging.exists())
-                        staging.deleteRecursively()
-                    check(staging.mkdirs()) { "Could not create shared cache staging directory ${staging.absolutePath}" }
+                    val tmp = versionDirectory.resolve("$outputName.tmp")
+                    if (tmp.exists())
+                        tmp.deleteRecursively()
+                    check(tmp.mkdirs()) { "Could not create shared cache staging directory ${tmp.absolutePath}" }
                     
                     try {
-                        producer(staging)
+                        producer(tmp)
                         try {
-                            staging.toPath().moveTo(entry.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                            tmp.toPath().moveTo(entry.toPath(), StandardCopyOption.ATOMIC_MOVE)
                         } catch (_: AtomicMoveNotSupportedException) {
-                            staging.toPath().moveTo(entry.toPath())
+                            tmp.toPath().moveTo(entry.toPath())
                         }
                     } catch (exception: Exception) {
                         throw IllegalStateException(
-                            "Failed to populate Origami's shared $outputName cache. Temporary files: ${staging.absolutePath}",
+                            "Failed to populate Origami's shared $outputName cache. Temporary files: ${tmp.absolutePath}",
                             exception,
                         )
                     }
@@ -76,21 +72,9 @@ internal class SharedTransformCache(
     }
     
     private fun copy(source: File, output: File) {
-        if (output.exists()) {
+        if (output.exists())
             check(output.deleteRecursively()) { "Could not clear transform output ${output.absolutePath}" }
-        }
-        
-        source.walkTopDown().forEach { sourceFile ->
-            val outputFile = output.resolve(sourceFile.relativeTo(source).path)
-            if (sourceFile.isDirectory) {
-                check(outputFile.mkdirs() || outputFile.isDirectory) { "Could not create transform output directory ${outputFile.absolutePath}" }
-            } else {
-                sourceFile.toPath().copyTo(outputFile.toPath())
-            }
-        }
+        check(source.copyRecursively(output)) { "Could not copy shared cache entry to ${output.absolutePath}" }
     }
     
 }
-
-private fun String.toCachePathSegment(): String =
-    replace(Regex("[^A-Za-z0-9._-]"), "_")

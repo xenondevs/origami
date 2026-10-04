@@ -9,7 +9,7 @@ import xyz.xenondevs.origami.task.run.ExtractPatchInputs
 import xyz.xenondevs.origami.task.run.GenerateAotCacheFingerprint
 import xyz.xenondevs.origami.task.run.PatchRunServerJar
 import xyz.xenondevs.origami.task.run.RunServer
-import xyz.xenondevs.origami.util.singleRegularFile
+import xyz.xenondevs.origami.util.singleFileProvider
 import xyz.xenondevs.origami.value.ListArgumentProvider
 
 internal fun Project.registerRunTasks(plugin: OrigamiPlugin, configs: OrigamiConfigurations) {
@@ -23,7 +23,7 @@ internal fun Project.registerRunTasks(plugin: OrigamiPlugin, configs: OrigamiCon
         javaLauncher.set(plugin.javaLauncherFor(project))
         setClasspath(configs.aotPatcher)
         
-        serverJar.set(configs.widenedServer.singleRegularFile(layout))
+        serverJar.fileProvider(configs.widenedServer.singleFileProvider())
         outputJar.set(layout.buildDirectory.file("origami/paper-server-mixin-patched.jar"))
         plugins.from(ext.plugins)
         patchFingerprint.set(extractPatchInputs.flatMap { it.outputDir })

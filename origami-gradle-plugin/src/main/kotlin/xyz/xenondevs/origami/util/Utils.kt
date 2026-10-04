@@ -21,27 +21,16 @@ internal fun <T : Any, C : Collection<T>> combinedProvider(
     vararg providers: Provider<out T>
 ): Provider<C> = providers.fold(initial) { acc, provider -> acc.zip(provider) { col, add -> append(col, add) } }
 
-internal fun RegularFileProperty.getAsPath(): Path =
-    get().asFile.toPath()
-
-internal val RegularFile.asPath: Path
-    get() = asFile.toPath()
-
-internal fun Provider<File>.toRegular(layout: ProjectLayout): Provider<RegularFile> =
-    layout.file(this)
-
 internal fun Configuration.singleModuleCoordinates(): Provider<String> =
     incoming.artifacts.resolvedArtifacts.map { artifacts ->
         val id = artifacts.single().id.componentIdentifier as ModuleComponentIdentifier
         "${id.group}:${id.module}:${id.version}"
     }
 
-internal fun Configuration.singleRegularFile(
-    layout: ProjectLayout,
+internal fun Configuration.singleFileProvider(
     optional: Boolean = false
-): Provider<RegularFile> {
+): Provider<File> {
     val files = elements
     return (if (optional) files.filter { it.isNotEmpty() } else files)
         .map { it.single().asFile }
-        .toRegular(layout)
 }

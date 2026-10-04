@@ -69,7 +69,7 @@ internal abstract class PrepareServerTransform : TransformAction<PrepareServerTr
         val state = outputs.dir("server-base")
         val cache = SharedTransformCache(
             parameters.sharedCache.get().asFile,
-            parameters.devBundleId.get().substringAfterLast(':'),
+            parameters.devBundleId.get(),
             "server-base",
         )
         
@@ -99,15 +99,8 @@ internal abstract class PrepareServerTransform : TransformAction<PrepareServerTr
             val downloads = downloadJson<VersionData>(versionUrl).downloads
             val serverDownload = checkNotNull(downloads["server"]) { "No server download exists for Minecraft ${config.minecraftVersion}" }
             
-            val pool = Executors.newFixedThreadPool(2)
-            pool.execute {
-                extractServer(serverDownload.url, config.minecraftVersion, vanillaServer, libraries)
-            }
-            downloads["server_mappings"]?.let { download ->
-                pool.execute { download(download.url, mappings) }
-            }
-            pool.shutdown()
-            check(pool.awaitTermination(10, TimeUnit.MINUTES)) { "Timed out downloading vanilla server files" }
+            extractServer(serverDownload.url, config.minecraftVersion, vanillaServer, libraries)
+            downloads["server_mappings"]?.let { download -> download(download.url, mappings) }
             
             logger.lifecycle("[Origami] Applying Paperclip patches for ${parameters.devBundleId.get()}")
             applyPaperclip(bundle, config, vanillaServer, work, state.resolve(PATCHED_SERVER_FILE))
