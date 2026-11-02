@@ -103,9 +103,7 @@ public class OrigamiAgent {
      */
     @SuppressWarnings("unused")
     public static void initOrigami(URL[] urls, ClassLoader classLoader, String[] args) {
-        // Logging from Mixin initializes Log4j on this thread. Use the PatchingClassLoader as context
-        // class loader, like Paperclip does for the server thread, so that Log4j plugins (such as
-        // TerminalConsoleAppender loading JLine terminal providers) can find their resources.
+        // ContextClassLoader required for "advanced terminal features" (see xenondevs/Origami#4)
         var thread = Thread.currentThread();
         var previousContextLoader = thread.getContextClassLoader();
         thread.setContextClassLoader(classLoader);
