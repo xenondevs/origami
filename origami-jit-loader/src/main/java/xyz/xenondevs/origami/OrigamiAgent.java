@@ -103,11 +103,17 @@ public class OrigamiAgent {
      */
     @SuppressWarnings("unused")
     public static void initOrigami(URL[] urls, ClassLoader classLoader, String[] args) {
+        // ContextClassLoader required for "advanced terminal features" (see xenondevs/Origami#4)
+        var thread = Thread.currentThread();
+        var previousContextLoader = thread.getContextClassLoader();
+        thread.setContextClassLoader(classLoader);
         try {
             origamiJit.getMethod("init", URL[].class, ClassLoader.class, String[].class)
                 .invoke(null, (Object) urls, classLoader, (Object) args);
         } catch (Throwable e) {
             throw new RuntimeException("Failed to initialize Origami", e);
+        } finally {
+            thread.setContextClassLoader(previousContextLoader);
         }
     }
     
